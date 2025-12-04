@@ -1,40 +1,58 @@
 <!doctype html>
-<html lang="en">
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RinkBoard | リンクホッケー・ローラーホッケー戦術ボード</title>
 
-  <title>RinkBoard | リンクホッケー・ローラーホッケー戦術ボード</title>
+    <meta
+      name="description"
+      content="RinkBoardはリンクホッケー/ローラーホッケー専用の戦術ボードアプリです。2D・3D対応、選手アイコン移動、描画ツール、カメラ操作、フォーメーション作成が可能。無料＆ブラウザで今すぐ使えます。"
+    />
+    <meta
+      name="keywords"
+      content="リンクホッケー, ローラーホッケー, 戦術ボード, 3D戦術, スポーツ戦術, フォーメーション"
+    />
 
-  <meta
-    name="description"
-    content="RinkBoardはリンクホッケー/ローラーホッケー専用の戦術ボードアプリです。2D・3D対応、選手アイコン移動、描画ツール、カメラ操作、フォーメーション作成が可能。無料＆ブラウザで今すぐ使えます。"
-  />
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://rinkboard-iota.vercel.app/" />
 
-  <!-- SEO Keywords（Googleは重要視しないが入れてOK） -->
-  <meta
-    name="keywords"
-    content="リンクホッケー, ローラーホッケー, 戦術ボード, 3D戦術, スポーツ戦術, フォーメーション"
-  />
+    <!-- OGP -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="RinkBoard" />
+    <meta
+      property="og:title"
+      content="RinkBoard | リンクホッケー・ローラーホッケー戦術ボード"
+    />
+    <meta
+      property="og:description"
+      content="リンクホッケー/ローラーホッケー専用の戦術ボード。2D/3D対応で自由に作戦を作れる無料アプリ。"
+    />
+    <meta
+      property="og:url"
+      content="https://rinkboard-iota.vercel.app/"
+    />
+    <meta property="og:image" content="/og-image.png" />
 
-  <!-- OGP（SNSでシェアされた時の見た目） -->
-  <meta property="og:title" content="RinkBoard | リンクホッケー戦術ボード" />
-  <meta
-    property="og:description"
-    content="リンクホッケー/ローラーホッケー専用の戦術ボード。2D/3D対応で自由に作戦を作れる無料アプリ。"
-  />
-  <meta property="og:image" content="/og-image.png" />
-  <meta property="og:url" content="https://rinkboard.vercel.app/" />
-  <meta property="og:type" content="website" />
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="RinkBoard | リンクホッケー・ローラーホッケー戦術ボード"
+    />
+    <meta
+      name="twitter:description"
+      content="リンクホッケー/ローラーホッケー専用の戦術ボード。2D/3D対応で自由に作戦を作れる無料アプリ。"
+    />
+    <meta name="twitter:image" content="/og-image.png" />
 
-  <!-- Twitterカード -->
-  <meta name="twitter:card" content="summary_large_image" />
-
-  <!-- Favicon（そのままでOK） -->
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-
-  <script type="module" src="/src/main.tsx"></script>
-</head>
-
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <!-- React / Vite エントリポイント -->
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>
