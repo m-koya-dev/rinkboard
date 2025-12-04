@@ -1,53 +1,67 @@
 <!doctype html>
-<html lang="ja">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <!-- 基本タイトル -->
-    <title>RinkBoard 3D | Roller Hockey Tactics Board</title>
-
-    <!-- 検索結果に出る説明文（日本語＆英語で簡潔に） -->
+    <title>RinkBoard | 2D &amp; 3D Roller Hockey Tactics Board</title>
     <meta
       name="description"
-      content="RinkBoard 3D はローラーホッケー（リンクホッケー）専用の2D/3D戦術ボードです。選手コマの配置、カメラ視点切り替え、ペンツールでの作戦共有など、世界中のコーチ・選手のための無料Webアプリです。"
+      content="RinkBoard is a free 2D & 3D tactics board for roller hockey coaches and players. Draw plays, move pieces, switch camera angles, and run tactics from any device."
     />
-
-    <!-- 主要キーワード（最近はあまり重要視されないが念のため） -->
     <meta
       name="keywords"
-      content="roller hockey, rink hockey, tactics board, 戦術ボード, ローラーホッケー, リンクホッケー, 3D tactics, coaching"
+      content="roller hockey, rink hockey, tactics board, strategy board, 3D tactics, coaching tool, 戦術ボード, リンクホッケー"
     />
+    <link rel="canonical" href="https://rinkboard-iota.vercel.app/" />
 
-    <!-- Open Graph (SNS共有用) -->
+    <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="RinkBoard 3D | Roller Hockey Tactics Board" />
+    <meta property="og:site_name" content="RinkBoard" />
+    <meta
+      property="og:title"
+      content="RinkBoard | 2D &amp; 3D Roller Hockey Tactics Board"
+    />
     <meta
       property="og:description"
-      content="ローラーホッケー専用の2D/3D戦術ボード。コーチング・ミーティング・動画分析に最適な無料Webツール。"
+      content="Interactive 2D & 3D tactics board designed for roller hockey. Plan systems, animate plays, and switch between coach and player view in your browser."
     />
-    <!-- 公開後、自分の本番URLに変更する -->
-    <meta property="og:url" content="https://rinkboard.example.com" />
-    <!-- ここも後で好きなOG画像を用意したら置き換え -->
-    <meta property="og:image" content="https://rinkboard.example.com/og-image.png" />
+    <meta property="og:url" content="https://rinkboard-iota.vercel.app/" />
+    <!-- 後で /public/og-image.png を置く想定 -->
+    <meta
+      property="og:image"
+      content="https://rinkboard-iota.vercel.app/og-image.png"
+    />
 
-    <!-- Twitterカード（X共有用） -->
+    <!-- Twitter / X Card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="RinkBoard 3D | Roller Hockey Tactics Board" />
+    <meta
+      name="twitter:title"
+      content="RinkBoard | 2D &amp; 3D Roller Hockey Tactics Board"
+    />
     <meta
       name="twitter:description"
-      content="ローラーホッケー（リンクホッケー）専用の2D/3D戦術ボードWebアプリ。"
+      content="Free browser tactics board for roller hockey: 2D view, 3D camera, drawing tools, and more."
     />
-    <meta name="twitter:image" content="https://rinkboard.example.com/og-image.png" />
+    <meta
+      name="twitter:image"
+      content="https://rinkboard-iota.vercel.app/og-image.png"
+    />
 
-    <!-- 多言語を意識した基本設定 -->
-    <meta http-equiv="Content-Language" content="ja, en" />
-
-    <!-- Vite が差し込むメインJS -->
-    <script type="module" src="/src/main.tsx"></script>
+    <!-- Google Analytics (GA4) は後で ID を入れたら有効にする -->
+    <!--
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-XXXXXXXXXX');
+    </script>
+    -->
   </head>
-  <body class="bg-slate-900">
+  <body>
     <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
