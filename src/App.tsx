@@ -102,6 +102,10 @@ function Header({
         )}
       </div>
 
+      <footer className="text-gray-400 text-xs text-center p-2">
+        RinkBoard - リンクホッケー / ローラーホッケー専用の戦術ボードアプリ
+      </footer>
+
       {/* 右：アクション系 */}
       <div className="flex items-center gap-2">
         <button className={buttonBase} onClick={undo}>
