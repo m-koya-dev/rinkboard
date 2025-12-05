@@ -21,14 +21,20 @@ function useLayout() {
 
   const worldW = 30;
   const worldH = 15;
-  const pad = 40;
 
-  // 画面いっぱいより少し余白が残るように 0.9 を掛ける
+  // 画面幅でモバイル判定
+  const isMobile = size.w < 768;
+
+  // 余白：PCではゆったり、モバイルではほぼ全画面
+  const pad = isMobile ? 8 : 40;
+
   const baseScale = Math.min(
     (size.w - pad * 2) / worldW,
     (size.h - pad * 2) / worldH
   );
-  const scale = baseScale * 0.9;
+
+  // モバイルはほぼ目一杯、PC は少し余裕を残す
+  const scale = baseScale * (isMobile ? 0.98 : 0.9);
 
   const rinkW = worldW * scale;
   const rinkH = worldH * scale;
@@ -44,6 +50,7 @@ function useLayout() {
     rinkH,
     offsetX,
     offsetY,
+    isMobile,
   };
 }
 
@@ -77,13 +84,12 @@ function PlayerToken({
   toWorldLocal,
   boardRotation,
   spacePressed,
+  tokenRadius,
+  fontSize,
 }: any) {
   const { selectedId, selectPlayer, updatePlayer } = useBoardStore();
   const sel = selectedId === id;
   const lp = toLocal(x, y);
-
-  const radius = 14;
-  const fontSize = radius * 1.2;
 
   return (
     <Group
@@ -114,13 +120,18 @@ function PlayerToken({
     >
       {sel && (
         <Circle
-          radius={radius + 6}
+          radius={tokenRadius + 6}
           stroke="#10b981"
           strokeWidth={3}
           opacity={0.9}
         />
       )}
-      <Circle radius={radius} fill={color} stroke="#0f172a" strokeWidth={2} />
+      <Circle
+        radius={tokenRadius}
+        fill={color}
+        stroke="#0f172a"
+        strokeWidth={2}
+      />
       {/* 背番号はボード回転に対して常に読みやすい向きに固定 */}
       <Group rotation={-boardRotation * 90}>
         <Text
@@ -148,6 +159,7 @@ export default function Board2D() {
     rinkH,
     offsetX,
     offsetY,
+    isMobile,
   } = useLayout();
   const { toLocal, toWorld } = makeConverters(worldW, worldH, scale);
   const {
@@ -162,13 +174,20 @@ export default function Board2D() {
 
   const boardRef = useRef<any>(null);
 
-  // Spaceキーによるパン
+  // Spaceキーによるパン（※モバイルでは実質オフにする）
   const [spacePressed, setSpacePressed] = useState(false);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
+    if (isMobile) {
+      // モバイルではスクロールパン機能は使わない
+      setSpacePressed(false);
+      setPan({ x: 0, y: 0 });
+      return;
+    }
+
     const keyDown = (e: KeyboardEvent) => {
       if (e.code === "Space") {
         e.preventDefault();
@@ -189,11 +208,11 @@ export default function Board2D() {
       window.removeEventListener("keydown", keyDown);
       window.removeEventListener("keyup", keyUp);
     };
-  }, []);
+  }, [isMobile]);
 
-  // パン開始
+  // パン開始（PC かつ spacePressed のときのみ）
   const handlePanStart = (e: any) => {
-    if (!spacePressed) return;
+    if (isMobile || !spacePressed) return;
     setIsPanning(true);
     const pos = e.target.getStage().getPointerPosition();
     setPanStart({ x: pos.x - pan.x, y: pos.y - pan.y });
@@ -201,7 +220,7 @@ export default function Board2D() {
 
   // パン中
   const handlePanMove = (e: any) => {
-    if (!isPanning || !spacePressed) return;
+    if (isMobile || !isPanning || !spacePressed) return;
     const pos = e.target.getStage().getPointerPosition();
     setPan({
       x: pos.x - panStart.x,
@@ -229,7 +248,7 @@ export default function Board2D() {
   };
 
   const handleMouseDown = (e: any) => {
-    if (spacePressed) {
+    if (!isMobile && spacePressed) {
       handlePanStart(e);
       return;
     }
@@ -245,7 +264,7 @@ export default function Board2D() {
   };
 
   const handleMouseMove = (e: any) => {
-    if (spacePressed) {
+    if (!isMobile && spacePressed) {
       handlePanMove(e);
       return;
     }
@@ -261,7 +280,7 @@ export default function Board2D() {
   };
 
   const handleMouseUp = () => {
-    if (spacePressed) {
+    if (!isMobile && spacePressed) {
       handlePanEnd();
       return;
     }
@@ -278,6 +297,13 @@ export default function Board2D() {
     });
     setCurrentLineWorld([]);
   };
+
+  // ===== 駒・ボールのサイズを scale から決める =====
+  // scale が大きければ駒も大きく、小さい画面でも視認性を保つ
+  const tokenRadius = Math.max(10, scale * 0.55);
+  const tokenFontSize = tokenRadius * 1.2;
+  const ballLocal = toLocal(ball.x, ball.y);
+  const ballR = Math.max(6, 0.25 * scale);
 
   // UI用の各種座標計算
   const midTop = toLocal(0, BOUNDS.yMax);
@@ -314,9 +340,6 @@ export default function Board2D() {
   const goalLeftPx = toLocal(BOUNDS.xMin + 1.5, 0);
   const goalRightPx = toLocal(BOUNDS.xMax - 1.5, 0);
 
-  const ballLocal = toLocal(ball.x, ball.y);
-  const ballR = 0.25 * scale;
-
   const outerFrameColor = "#22c55e";
   const rinkFill = "#fbe4cf";
   const goalAreaFill = "#f8d2b0";
@@ -324,6 +347,10 @@ export default function Board2D() {
   const lineW = 0.08 * scale;
   const cornerR = 1.5 * scale;
   const outerMargin = 12;
+
+  // パンは PC のみ有効。モバイルでは常に (0,0)
+  const panX = isMobile ? 0 : pan.x;
+  const panY = isMobile ? 0 : pan.y;
 
   return (
     <Stage
@@ -335,8 +362,8 @@ export default function Board2D() {
       onClick={() => selectPlayer(null)}
     >
       <Layer>
-        {/* パン用の外側グループ */}
-        <Group x={pan.x} y={pan.y}>
+        {/* パン用の外側グループ（モバイルでは常に固定） */}
+        <Group x={panX} y={panY}>
           {/* 回転を含めたリンク全体 */}
           <Group
             ref={boardRef}
@@ -503,6 +530,8 @@ export default function Board2D() {
                 toWorldLocal={toWorld}
                 boardRotation={boardRotation}
                 spacePressed={spacePressed}
+                tokenRadius={tokenRadius}
+                fontSize={tokenFontSize}
               />
             ))}
           </Group>
