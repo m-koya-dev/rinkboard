@@ -48,6 +48,11 @@ interface BoardState {
   setMode3D: (mode: Mode3D) => void;
 }
 
+// ------- 画面幅から「初期モバイルかどうか」を判定 -------
+// window が無い環境（ビルド時など）でも落ちないように typeof チェック
+const isMobileInit =
+  typeof window !== "undefined" ? window.innerWidth < 768 : false;
+
 function createInitialPlayers(): Player[] {
   // 左チーム（A）：GK + FP4
   const teamA: Player[] = [
@@ -158,7 +163,10 @@ const initialBall: Ball = {
 export const useBoardStore = create<BoardState>((set) => ({
   players: createInitialPlayers(),
   ball: initialBall,
-  boardRotation: 0,
+
+  // ★ ここがポイント：モバイルなら 1（縦）、PC なら 0（横）
+  boardRotation: isMobileInit ? (1 as 0 | 1 | 2 | 3) : (0 as 0 | 1 | 2 | 3),
+
   selectedId: null,
   mode3D: "camera", // ← デフォルトはカメラ操作
 
@@ -185,7 +193,8 @@ export const useBoardStore = create<BoardState>((set) => ({
     set({
       players: createInitialPlayers(),
       ball: initialBall,
-      boardRotation: 0,
+      // リセット時も、最初と同じ「デバイス別の初期向き」に戻す
+      boardRotation: isMobileInit ? (1 as 0 | 1 | 2 | 3) : (0 as 0 | 1 | 2 | 3),
       selectedId: null,
       mode3D: "camera",
     }),
@@ -296,4 +305,3 @@ export const useDrawStore = create<DrawState>((set, get) => ({
       historyIndex: 0,
     }),
 }));
-

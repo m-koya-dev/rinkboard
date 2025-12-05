@@ -1,15 +1,6 @@
-// ★ 重要：このファイルを丸ごと置き換えてください ★
-
+// src/boards/Board2D.tsx
 import { useEffect, useRef, useState } from "react";
-import {
-  Stage,
-  Layer,
-  Rect,
-  Line,
-  Circle,
-  Group,
-  Text,
-} from "react-konva";
+import { Stage, Layer, Rect, Line, Circle, Group, Text } from "react-konva";
 import { BOUNDS, useBoardStore, useDrawStore } from "../store";
 
 function useLayout() {
@@ -31,10 +22,13 @@ function useLayout() {
   const worldW = 30;
   const worldH = 15;
   const pad = 40;
-  const scale = Math.min(
+
+  // 画面いっぱいより少し余白が残るように 0.9 を掛ける
+  const baseScale = Math.min(
     (size.w - pad * 2) / worldW,
     (size.h - pad * 2) / worldH
   );
+  const scale = baseScale * 0.9;
 
   const rinkW = worldW * scale;
   const rinkH = worldH * scale;
@@ -54,11 +48,13 @@ function useLayout() {
 }
 
 function makeConverters(worldW: number, worldH: number, scale: number) {
+  // world(−15〜+15, −7.5〜+7.5) → リンク内ローカル座標(左上原点)
   const toLocal = (x: number, y: number) => ({
     x: (x + worldW / 2) * scale,
     y: (worldH / 2 - y) * scale,
   });
 
+  // リンク内ローカル → world 座標
   const toWorld = (lx: number, ly: number) => ({
     x: lx / scale - worldW / 2,
     y: worldH / 2 - ly / scale,
@@ -94,15 +90,22 @@ function PlayerToken({
       x={lp.x}
       y={lp.y}
       draggable={!spacePressed}
-      dragBoundFunc={(pos) => {
-        const w = toWorldLocal(pos.x, pos.y);
+      onDragEnd={(e) => {
+        // ドラッグ終了位置（リンク内ローカル）
+        const lx = e.target.x();
+        const ly = e.target.y();
+
+        // world に変換してコート内に clamp
+        const w = toWorldLocal(lx, ly);
         const nx = clamp(w.x, BOUNDS.xMin + 0.5, BOUNDS.xMax - 0.5);
         const ny = clamp(w.y, BOUNDS.yMin + 0.5, BOUNDS.yMax - 0.5);
-        return toLocal(nx, ny);
-      }}
-      onDragEnd={(e) => {
-        const w = toWorldLocal(e.target.x(), e.target.y());
-        updatePlayer(id, { x: w.x, y: w.y });
+
+        // ローカル座標に戻して、見た目もスナップ
+        const snapped = toLocal(nx, ny);
+        e.target.position(snapped);
+
+        // 状態を更新
+        updatePlayer(id, { x: nx, y: ny });
       }}
       onClick={(e) => {
         e.cancelBubble = true;
@@ -117,12 +120,8 @@ function PlayerToken({
           opacity={0.9}
         />
       )}
-      <Circle
-        radius={radius}
-        fill={color}
-        stroke="#0f172a"
-        strokeWidth={2}
-      />
+      <Circle radius={radius} fill={color} stroke="#0f172a" strokeWidth={2} />
+      {/* 背番号はボード回転に対して常に読みやすい向きに固定 */}
       <Group rotation={-boardRotation * 90}>
         <Text
           text={String(number)}
@@ -163,12 +162,12 @@ export default function Board2D() {
 
   const boardRef = useRef<any>(null);
 
+  // Spaceキーによるパン
   const [spacePressed, setSpacePressed] = useState(false);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
 
-  // ===== Spaceキー状態 =====
   useEffect(() => {
     const keyDown = (e: KeyboardEvent) => {
       if (e.code === "Space") {
@@ -192,33 +191,30 @@ export default function Board2D() {
     };
   }, []);
 
-  // ====== パン開始 ======
+  // パン開始
   const handlePanStart = (e: any) => {
     if (!spacePressed) return;
-
     setIsPanning(true);
     const pos = e.target.getStage().getPointerPosition();
     setPanStart({ x: pos.x - pan.x, y: pos.y - pan.y });
   };
 
-  // ====== パン中 ======
+  // パン中
   const handlePanMove = (e: any) => {
     if (!isPanning || !spacePressed) return;
-
     const pos = e.target.getStage().getPointerPosition();
-
     setPan({
       x: pos.x - panStart.x,
       y: pos.y - panStart.y,
     });
   };
 
-  // ====== パン終了 ======
+  // パン終了
   const handlePanEnd = () => {
     setIsPanning(false);
   };
 
-  // ====== ペン描き ======
+  // ペン描き
   const [currentLineWorld, setCurrentLineWorld] = useState<number[]>([]);
 
   const getLocalFromStage = (stage: any) => {
@@ -228,6 +224,7 @@ export default function Board2D() {
     const transform = boardRef.current.getAbsoluteTransform().copy();
     transform.invert();
 
+    // boardRef ローカル座標に変換
     return transform.point(pos);
   };
 
@@ -236,14 +233,12 @@ export default function Board2D() {
       handlePanStart(e);
       return;
     }
-
     if (!penEnabled) return;
 
     const stage = e.target.getStage();
     const local = getLocalFromStage(stage);
     if (!local) return;
-    if (local.x < 0 || local.y < 0 || local.x > rinkW || local.y > rinkH)
-      return;
+    if (local.x < 0 || local.y < 0 || local.x > rinkW || local.y > rinkH) return;
 
     const w = toWorld(local.x, local.y);
     setCurrentLineWorld([w.x, w.y]);
@@ -254,13 +249,12 @@ export default function Board2D() {
       handlePanMove(e);
       return;
     }
-
     if (!penEnabled || currentLineWorld.length === 0) return;
+
     const stage = e.target.getStage();
     const local = getLocalFromStage(stage);
     if (!local) return;
-    if (local.x < 0 || local.y < 0 || local.x > rinkW || local.y > rinkH)
-      return;
+    if (local.x < 0 || local.y < 0 || local.x > rinkW || local.y > rinkH) return;
 
     const w = toWorld(local.x, local.y);
     setCurrentLineWorld((prev) => [...prev, w.x, w.y]);
@@ -285,7 +279,7 @@ export default function Board2D() {
     setCurrentLineWorld([]);
   };
 
-  // ===== UI描画 =====
+  // UI用の各種座標計算
   const midTop = toLocal(0, BOUNDS.yMax);
   const midBot = toLocal(0, BOUNDS.yMin);
   const center = toLocal(0, 0);
@@ -296,8 +290,7 @@ export default function Board2D() {
   const penaltyBackXRight = BOUNDS.xMax - 2.5;
   const penaltyFrontXRight = 7;
   const penaltyHeightPx = 6 * scale;
-  const penaltyWidthPx =
-    (penaltyFrontXLeft - penaltyBackXLeft) * scale;
+  const penaltyWidthPx = (penaltyFrontXLeft - penaltyBackXLeft) * scale;
 
   const penaltyCenterLeftPx = toLocal(
     (penaltyBackXLeft + penaltyFrontXLeft) / 2,
@@ -342,9 +335,9 @@ export default function Board2D() {
       onClick={() => selectPlayer(null)}
     >
       <Layer>
-        {/* ==== パン（スクロール）を適用するグループ ==== */}
+        {/* パン用の外側グループ */}
         <Group x={pan.x} y={pan.y}>
-          {/* --- リンク全体を回転するグループ --- */}
+          {/* 回転を含めたリンク全体 */}
           <Group
             ref={boardRef}
             x={offsetX + rinkW / 2}
@@ -353,7 +346,7 @@ export default function Board2D() {
             offsetY={rinkH / 2}
             rotation={boardRotation * 90}
           >
-            {/* 外枠 */}
+            {/* 外枠(緑) */}
             <Rect
               x={-outerMargin}
               y={-outerMargin}
@@ -363,7 +356,7 @@ export default function Board2D() {
               cornerRadius={cornerR + outerMargin}
             />
 
-            {/* コート */}
+            {/* コート本体 */}
             <Rect
               x={0}
               y={0}
@@ -391,7 +384,7 @@ export default function Board2D() {
               strokeWidth={lineW}
             />
 
-            {/* ペナルティエリア */}
+            {/* ペナルティエリア（左右） */}
             {[penaltyCenterLeftPx, penaltyCenterRightPx].map((p, i) => (
               <Group key={i}>
                 <Rect
@@ -412,24 +405,13 @@ export default function Board2D() {
               </Group>
             ))}
 
-            {/* ペナルティ前の中央ドット */}
+            {/* ペナルティ前のドット */}
             {frontDots.map((d, i) => (
-              <Circle
-                key={i}
-                x={d.x}
-                y={d.y}
-                radius={dotR}
-                fill={lineColor}
-              />
+              <Circle key={i} x={d.x} y={d.y} radius={dotR} fill={lineColor} />
             ))}
 
             {/* PKスポット */}
-            <Circle
-              x={pkLeftPx.x}
-              y={pkLeftPx.y}
-              radius={pkR}
-              fill={lineColor}
-            />
+            <Circle x={pkLeftPx.x} y={pkLeftPx.y} radius={pkR} fill={lineColor} />
             <Circle
               x={pkRightPx.x}
               y={pkRightPx.y}
@@ -437,7 +419,7 @@ export default function Board2D() {
               fill={lineColor}
             />
 
-            {/* ゴール */}
+            {/* ゴール（左右） */}
             {[goalLeftPx, goalRightPx].map((g, idx) => (
               <Rect
                 key={idx}
@@ -451,14 +433,14 @@ export default function Board2D() {
               />
             ))}
 
-            {/* 完了線 */}
+            {/* 完了している線 */}
             {lines.map((ln, i) => (
               <Line
                 key={i}
-                points={ln.points.flatMap((v, i) =>
-                  i % 2 === 0
-                    ? toLocal(ln.points[i], ln.points[i + 1]).x
-                    : toLocal(ln.points[i - 1], v).y
+                points={ln.points.flatMap((v, idx) =>
+                  idx % 2 === 0
+                    ? toLocal(ln.points[idx], ln.points[idx + 1]).x
+                    : toLocal(ln.points[idx - 1], v).y
                 )}
                 stroke={ln.color}
                 strokeWidth={ln.width}
@@ -476,10 +458,13 @@ export default function Board2D() {
             {/* 描き途中の線 */}
             {currentLineWorld.length > 0 && (
               <Line
-                points={currentLineWorld.flatMap((v, i) =>
-                  i % 2 === 0
-                    ? toLocal(currentLineWorld[i], currentLineWorld[i + 1]).x
-                    : toLocal(currentLineWorld[i - 1], v).y
+                points={currentLineWorld.flatMap((v, idx) =>
+                  idx % 2 === 0
+                    ? toLocal(
+                        currentLineWorld[idx],
+                        currentLineWorld[idx + 1]
+                      ).x
+                    : toLocal(currentLineWorld[idx - 1], v).y
                 )}
                 stroke={penColor}
                 strokeWidth={penWidth}
@@ -493,16 +478,17 @@ export default function Board2D() {
               x={ballLocal.x}
               y={ballLocal.y}
               draggable={!spacePressed}
-              dragBoundFunc={(pos) => {
-                const w = toWorld(pos.x, pos.y);
-                return toLocal(
-                  clamp(w.x, BOUNDS.xMin + 0.3, BOUNDS.xMax - 0.3),
-                  clamp(w.y, BOUNDS.yMin + 0.3, BOUNDS.yMax - 0.3)
-                );
-              }}
               onDragEnd={(e) => {
-                const w = toWorld(e.target.x(), e.target.y());
-                updateBall({ x: w.x, y: w.y });
+                const lx = e.target.x();
+                const ly = e.target.y();
+                const w = toWorld(lx, ly);
+
+                const nx = clamp(w.x, BOUNDS.xMin + 0.3, BOUNDS.xMax - 0.3);
+                const ny = clamp(w.y, BOUNDS.yMin + 0.3, BOUNDS.yMax - 0.3);
+
+                const snapped = toLocal(nx, ny);
+                e.target.position(snapped);
+                updateBall({ x: nx, y: ny });
               }}
             >
               <Circle radius={ballR} fill="#111" />
@@ -525,9 +511,3 @@ export default function Board2D() {
     </Stage>
   );
 }
-
-
-
-
-
-

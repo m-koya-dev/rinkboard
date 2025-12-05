@@ -1,5 +1,5 @@
 // src/App.tsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Board2D from "./boards/Board2D";
 import Board3D from "./boards/Board3D";
 import { useBoardStore, useDrawStore } from "./store";
@@ -30,10 +30,8 @@ function Header({
   const buttonBase =
     "inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium border border-white/15 text-slate-100 hover:bg-white/10 transition";
 
-  const mode3DBase =
-    "px-2 py-0.5 rounded-full text-[11px] border transition";
-  const mode3DActive =
-    mode3DBase + " bg-sky-500 text-white border-sky-400";
+  const mode3DBase = "px-2 py-0.5 rounded-full text-[11px] border transition";
+  const mode3DActive = mode3DBase + " bg-sky-500 text-white border-sky-400";
   const mode3DInactive =
     mode3DBase +
     " bg-white/5 text-slate-100 border-white/10 hover:bg-white/10";
@@ -55,45 +53,35 @@ function Header({
         </div>
       </div>
 
-      {/* 中央：ビュー切り替え + 3D操作モード */}
+      {/* 中央：ビュー切り替え */}
       <div className="flex flex-col items-center gap-1">
         <div className="bg-slate-800/80 border border-slate-700 rounded-full p-1 flex items-center gap-1">
           <button
-            className={
-              viewMode === "2d" ? activeTab : inactiveTab
-            }
+            className={viewMode === "2d" ? activeTab : inactiveTab}
             onClick={() => setViewMode("2d")}
           >
             2D View
           </button>
           <button
-            className={
-              viewMode === "3d" ? activeTab : inactiveTab
-            }
+            className={viewMode === "3d" ? activeTab : inactiveTab}
             onClick={() => setViewMode("3d")}
           >
             3D View
           </button>
         </div>
 
-        {/* 3D表示中だけ、カメラ/駒の操作モードを表示 */}
+        {/* 3D 表示中だけ操作モード */}
         {viewMode === "3d" && (
           <div className="flex items-center gap-2 text-[11px] text-slate-300">
-            <span className="text-[10px] text-slate-400">
-              3D 操作:
-            </span>
+            <span className="text-[10px] text-slate-400">3D 操作:</span>
             <button
-              className={
-                mode3D === "camera" ? mode3DActive : mode3DInactive
-              }
+              className={mode3D === "camera" ? mode3DActive : mode3DInactive}
               onClick={() => setMode3D("camera")}
             >
               Camera
             </button>
             <button
-              className={
-                mode3D === "piece" ? mode3DActive : mode3DInactive
-              }
+              className={mode3D === "piece" ? mode3DActive : mode3DInactive}
               onClick={() => setMode3D("piece")}
             >
               Pieces
@@ -102,30 +90,31 @@ function Header({
         )}
       </div>
 
-      <footer className="text-gray-400 text-xs text-center p-2">
-        RinkBoard - リンクホッケー / ローラーホッケー専用の戦術ボードアプリ
-      </footer>
-
-      {/* 右：アクション系 */}
-      <div className="flex items-center gap-2">
-        <button className={buttonBase} onClick={undo}>
-          ⬅︎ Undo
-        </button>
-        <button className={buttonBase} onClick={redo}>
-          ➝ Redo
-        </button>
-        <button className={buttonBase} onClick={rotateBoard}>
-          ⟳ Rotate
-        </button>
-        <button
-          className={buttonBase}
-          onClick={() => {
-            clearAllLines();
-            resetPositions();
-          }}
-        >
-          Reset
-        </button>
+      {/* 右：アクション */}
+      <div className="flex flex-col items-end gap-1">
+        <div className="flex items-center gap-2">
+          <button className={buttonBase} onClick={undo}>
+            ⬅︎ Undo
+          </button>
+          <button className={buttonBase} onClick={redo}>
+            ➝ Redo
+          </button>
+          <button className={buttonBase} onClick={rotateBoard}>
+            ⟳ Rotate
+          </button>
+          <button
+            className={buttonBase}
+            onClick={() => {
+              clearAllLines();
+              resetPositions();
+            }}
+          >
+            Reset
+          </button>
+        </div>
+        <div className="text-gray-400 text-[11px]">
+          RinkBoard - リンクホッケー / ローラーホッケー専用の戦術ボードアプリ
+        </div>
       </div>
     </header>
   );
@@ -138,8 +127,7 @@ function Sidebar() {
   const itemBase =
     "w-full flex flex-col items-center gap-1 px-2 py-3 text-[11px] cursor-pointer border-l-2 transition";
   const activeItem =
-    itemBase +
-    " border-emerald-400 bg-emerald-500/10 text-emerald-300";
+    itemBase + " border-emerald-400 bg-emerald-500/10 text-emerald-300";
   const inactiveItem =
     itemBase +
     " border-transparent text-slate-300 hover:bg:white/5 hover:border-slate-600";
@@ -164,7 +152,6 @@ function Sidebar() {
 
   return (
     <aside className="w-20 bg-slate-900/95 border-r border-slate-800 flex flex-col items-stretch pt-3 pb-4 gap-2">
-      {/* メインツール */}
       <div className="flex-1 flex flex-col gap-1">
         <ToolButton id="select" label="Select" icon="🖱" />
         <ToolButton id="pen" label="Pen" icon="✏️" />
@@ -214,27 +201,57 @@ export default function App() {
   const [viewMode, setViewMode] = useState<ViewMode>("2d");
   const { mode3D, setMode3D } = useBoardStore();
 
+  // 画面幅からモバイルかどうかを判定
+  const initialMobile =
+    typeof window !== "undefined" ? window.innerWidth < 768 : false;
+
+  const [isMobile, setIsMobile] = useState(initialMobile);
+  // PC: 常に UI 表示 / モバイル: 初期は非表示
+  const [showUI, setShowUI] = useState(!initialMobile);
+
+  useEffect(() => {
+    const onResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (!mobile) {
+        setShowUI(true); // PC のときは常に UI を出す
+      }
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   return (
     <div className="w-screen h-screen flex flex-col bg-slate-950 text-slate-100">
-      {/* ヘッダー */}
-      <Header
-        viewMode={viewMode}
-        setViewMode={setViewMode}
-        mode3D={mode3D}
-        setMode3D={setMode3D}
-      />
+      {/* ヘッダー：PC では常に表示 / モバイルは showUI のときだけ */}
+      {(!isMobile || showUI) && (
+        <Header
+          viewMode={viewMode}
+          setViewMode={setViewMode}
+          mode3D={mode3D}
+          setMode3D={setMode3D}
+        />
+      )}
 
-      {/* 下部レイアウト：左サイドバー + 中央ボード */}
+      {/* 下部レイアウト：左サイドバー + メインボード */}
       <div className="flex flex-1 min-h-0">
-        {/* 左ツールバー */}
-        <Sidebar />
+        {/* サイドバーも同じ条件 */}
+        {(!isMobile || showUI) && <Sidebar />}
 
-        {/* メインボードエリア */}
-        <main className="flex-1 min-h-0 min-w-0 bg-slate-900">
+        <main className="relative flex-1 min-h-0 min-w-0 bg-slate-900">
           {viewMode === "2d" ? <Board2D /> : <Board3D />}
+
+          {/* モバイル専用のメニューボタン */}
+          {isMobile && (
+            <button
+              className="md:hidden fixed bottom-3 left-3 z-50 px-3 py-2 rounded-full bg-slate-900/90 border border-slate-600 text-xs text-slate-100 shadow-lg"
+              onClick={() => setShowUI((v) => !v)}
+            >
+              {showUI ? "✕ メニュー" : "☰ メニュー"}
+            </button>
+          )}
         </main>
       </div>
     </div>
   );
 }
-
