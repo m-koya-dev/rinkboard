@@ -3,6 +3,12 @@ import { useEffect, useRef, useState } from "react";
 import { Stage, Layer, Rect, Line, Circle, Group, Text } from "react-konva";
 import { BOUNDS, useBoardStore, useDrawStore } from "../store";
 
+/**
+ * レイアウト計算：
+ * - worldW/worldH はリンクの「実寸」
+ * - scale は画面に合わせて計算
+ * - centerX/centerY は画面の中心（ここにリンクの中心を置く）
+ */
 function useLayout() {
   const [size, setSize] = useState({
     w: window.innerWidth,
@@ -22,24 +28,27 @@ function useLayout() {
   const worldW = 30;
   const worldH = 15;
 
-  // 画面幅でモバイル判定
   const isMobile = size.w < 768;
 
-  // 余白：PCではゆったり、モバイルではほぼ全画面
-  const pad = isMobile ? 8 : 40;
+  // ===== スケール計算 =====
+  // ・リンクの長辺は 30（worldW）
+  // ・縦でも横でも「30×scale」がはみ出さないようにしておけば、
+  //   どの回転でも必ず画面内に収まる
+  const pad = isMobile ? 4 : 40;
+  const maxBoardWorldDim = 30; // 30m が一番長い
 
-  const baseScale = Math.min(
-    (size.w - pad * 2) / worldW,
-    (size.h - pad * 2) / worldH
-  );
+  const baseScale =
+    (Math.min(size.w, size.h) - pad * 2) / maxBoardWorldDim;
 
-  // モバイルはほぼ目一杯、PC は少し余裕を残す
-  const scale = baseScale * (isMobile ? 0.98 : 0.9);
+  // PCは少しだけ余裕を残す、モバイルはめいっぱい
+  const scale = baseScale * (isMobile ? 1.0 : 0.9);
 
-  const rinkW = worldW * scale;
-  const rinkH = worldH * scale;
-  const offsetX = (size.w - rinkW) / 2;
-  const offsetY = (size.h - rinkH) / 2;
+  const rinkW = worldW * scale; // 30 * scale
+  const rinkH = worldH * scale; // 15 * scale
+
+  // 画面中心
+  const centerX = size.w / 2;
+  const centerY = size.h / 2;
 
   return {
     size,
@@ -48,20 +57,21 @@ function useLayout() {
     worldH,
     rinkW,
     rinkH,
-    offsetX,
-    offsetY,
+    centerX,
+    centerY,
     isMobile,
   };
 }
 
+/**
+ * world(−15〜+15, −7.5〜+7.5) <-> リンク内ローカル座標(左上基準)
+ */
 function makeConverters(worldW: number, worldH: number, scale: number) {
-  // world(−15〜+15, −7.5〜+7.5) → リンク内ローカル座標(左上原点)
   const toLocal = (x: number, y: number) => ({
     x: (x + worldW / 2) * scale,
     y: (worldH / 2 - y) * scale,
   });
 
-  // リンク内ローカル → world 座標
   const toWorld = (lx: number, ly: number) => ({
     x: lx / scale - worldW / 2,
     y: worldH / 2 - ly / scale,
@@ -97,20 +107,16 @@ function PlayerToken({
       y={lp.y}
       draggable={!spacePressed}
       onDragEnd={(e) => {
-        // ドラッグ終了位置（リンク内ローカル）
         const lx = e.target.x();
         const ly = e.target.y();
 
-        // world に変換してコート内に clamp
         const w = toWorldLocal(lx, ly);
         const nx = clamp(w.x, BOUNDS.xMin + 0.5, BOUNDS.xMax - 0.5);
         const ny = clamp(w.y, BOUNDS.yMin + 0.5, BOUNDS.yMax - 0.5);
 
-        // ローカル座標に戻して、見た目もスナップ
         const snapped = toLocal(nx, ny);
         e.target.position(snapped);
 
-        // 状態を更新
         updatePlayer(id, { x: nx, y: ny });
       }}
       onClick={(e) => {
@@ -157,8 +163,8 @@ export default function Board2D() {
     worldH,
     rinkW,
     rinkH,
-    offsetX,
-    offsetY,
+    centerX,
+    centerY,
     isMobile,
   } = useLayout();
   const { toLocal, toWorld } = makeConverters(worldW, worldH, scale);
@@ -174,7 +180,7 @@ export default function Board2D() {
 
   const boardRef = useRef<any>(null);
 
-  // Spaceキーによるパン（※モバイルでは実質オフにする）
+  // ===== Space + ドラッグでパン（PCのみ有効） =====
   const [spacePressed, setSpacePressed] = useState(false);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
@@ -182,7 +188,6 @@ export default function Board2D() {
 
   useEffect(() => {
     if (isMobile) {
-      // モバイルではスクロールパン機能は使わない
       setSpacePressed(false);
       setPan({ x: 0, y: 0 });
       return;
@@ -210,7 +215,6 @@ export default function Board2D() {
     };
   }, [isMobile]);
 
-  // パン開始（PC かつ spacePressed のときのみ）
   const handlePanStart = (e: any) => {
     if (isMobile || !spacePressed) return;
     setIsPanning(true);
@@ -218,7 +222,6 @@ export default function Board2D() {
     setPanStart({ x: pos.x - pan.x, y: pos.y - pan.y });
   };
 
-  // パン中
   const handlePanMove = (e: any) => {
     if (isMobile || !isPanning || !spacePressed) return;
     const pos = e.target.getStage().getPointerPosition();
@@ -228,12 +231,11 @@ export default function Board2D() {
     });
   };
 
-  // パン終了
   const handlePanEnd = () => {
     setIsPanning(false);
   };
 
-  // ペン描き
+  // ===== ペン描画関係 =====
   const [currentLineWorld, setCurrentLineWorld] = useState<number[]>([]);
 
   const getLocalFromStage = (stage: any) => {
@@ -243,7 +245,6 @@ export default function Board2D() {
     const transform = boardRef.current.getAbsoluteTransform().copy();
     transform.invert();
 
-    // boardRef ローカル座標に変換
     return transform.point(pos);
   };
 
@@ -298,14 +299,14 @@ export default function Board2D() {
     setCurrentLineWorld([]);
   };
 
-  // ===== 駒・ボールのサイズを scale から決める =====
-  // scale が大きければ駒も大きく、小さい画面でも視認性を保つ
+  // ===== 駒・ボールのサイズ =====
   const tokenRadius = Math.max(10, scale * 0.55);
   const tokenFontSize = tokenRadius * 1.2;
+
   const ballLocal = toLocal(ball.x, ball.y);
   const ballR = Math.max(6, 0.25 * scale);
 
-  // UI用の各種座標計算
+  // ===== コート描画用座標 =====
   const midTop = toLocal(0, BOUNDS.yMax);
   const midBot = toLocal(0, BOUNDS.yMin);
   const center = toLocal(0, 0);
@@ -316,7 +317,8 @@ export default function Board2D() {
   const penaltyBackXRight = BOUNDS.xMax - 2.5;
   const penaltyFrontXRight = 7;
   const penaltyHeightPx = 6 * scale;
-  const penaltyWidthPx = (penaltyFrontXLeft - penaltyBackXLeft) * scale;
+  const penaltyWidthPx =
+    (penaltyFrontXLeft - penaltyBackXLeft) * scale;
 
   const penaltyCenterLeftPx = toLocal(
     (penaltyBackXLeft + penaltyFrontXLeft) / 2,
@@ -348,7 +350,6 @@ export default function Board2D() {
   const cornerR = 1.5 * scale;
   const outerMargin = 12;
 
-  // パンは PC のみ有効。モバイルでは常に (0,0)
   const panX = isMobile ? 0 : pan.x;
   const panY = isMobile ? 0 : pan.y;
 
@@ -362,26 +363,28 @@ export default function Board2D() {
       onClick={() => selectPlayer(null)}
     >
       <Layer>
-        {/* パン用の外側グループ（モバイルでは常に固定） */}
+        {/* パン用グループ（モバイルでは常に固定） */}
         <Group x={panX} y={panY}>
-          {/* 回転を含めたリンク全体 */}
+          {/* リンク全体（centerX, centerY に配置） */}
           <Group
             ref={boardRef}
-            x={offsetX + rinkW / 2}
-            y={offsetY + rinkH / 2}
+            x={centerX}
+            y={centerY}
             offsetX={rinkW / 2}
             offsetY={rinkH / 2}
             rotation={boardRotation * 90}
           >
-            {/* 外枠(緑) */}
-            <Rect
-              x={-outerMargin}
-              y={-outerMargin}
-              width={rinkW + outerMargin * 2}
-              height={rinkH + outerMargin * 2}
-              fill={outerFrameColor}
-              cornerRadius={cornerR + outerMargin}
-            />
+            {/* 外枠：PCのみ表示、スマホは省略してリンクのみ */}
+            {!isMobile && (
+              <Rect
+                x={-outerMargin}
+                y={-outerMargin}
+                width={rinkW + outerMargin * 2}
+                height={rinkH + outerMargin * 2}
+                fill={outerFrameColor}
+                cornerRadius={cornerR + outerMargin}
+              />
+            )}
 
             {/* コート本体 */}
             <Rect
@@ -411,7 +414,7 @@ export default function Board2D() {
               strokeWidth={lineW}
             />
 
-            {/* ペナルティエリア（左右） */}
+            {/* ペナルティエリア */}
             {[penaltyCenterLeftPx, penaltyCenterRightPx].map((p, i) => (
               <Group key={i}>
                 <Rect
@@ -434,11 +437,22 @@ export default function Board2D() {
 
             {/* ペナルティ前のドット */}
             {frontDots.map((d, i) => (
-              <Circle key={i} x={d.x} y={d.y} radius={dotR} fill={lineColor} />
+              <Circle
+                key={i}
+                x={d.x}
+                y={d.y}
+                radius={dotR}
+                fill={lineColor}
+              />
             ))}
 
             {/* PKスポット */}
-            <Circle x={pkLeftPx.x} y={pkLeftPx.y} radius={pkR} fill={lineColor} />
+            <Circle
+              x={pkLeftPx.x}
+              y={pkLeftPx.y}
+              radius={pkR}
+              fill={lineColor}
+            />
             <Circle
               x={pkRightPx.x}
               y={pkRightPx.y}
@@ -446,7 +460,7 @@ export default function Board2D() {
               fill={lineColor}
             />
 
-            {/* ゴール（左右） */}
+            {/* ゴール */}
             {[goalLeftPx, goalRightPx].map((g, idx) => (
               <Rect
                 key={idx}
