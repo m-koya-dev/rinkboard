@@ -27,29 +27,18 @@ function useLayout() {
 
   const isMobile = size.w < 768;
 
-  // モバイルでは下部ツールバー分の高さを差し引く（だいたい 72px）
-  const toolbarH = isMobile ? 72 : 0;
+  // モバイルでは下部ツールバー（h-16≈64px）ぶんを差し引く
+  const toolbarH = isMobile ? 64 : 0;
   const stageW = size.w;
   const stageH = size.h - toolbarH;
 
-  // ===== スケール計算 =====
-  let scale: number;
-
-  if (isMobile) {
-    // モバイル：縦向き前提。短い辺に合わせて「はみ出さず最大限」
-    const pad = 4;
-    const maxBoardWorldDim = 30; // 長辺は 30m
-    const baseScale =
-      (Math.min(stageW, stageH) - pad * 2) / maxBoardWorldDim;
-    scale = baseScale;
-  } else {
-    // PC：以前と同じイメージ（横長で気持ちよく収まる）
-    const pad = 40;
-    scale = Math.min(
-      (stageW - pad * 2) / worldW,
-      (stageH - pad * 2) / worldH
-    );
-  }
+  // ★ここが今回の重要ポイント★
+  // PCもスマホも「ボードの 30x15 を画面いっぱいに収める」ようにスケール計算
+  const pad = isMobile ? 0 : 40; // モバイルは余白ゼロ、PCは少し余白あり
+  const scale = Math.min(
+    (stageW - pad * 2) / worldW,
+    (stageH - pad * 2) / worldH
+  );
 
   const rinkW = worldW * scale; // 30 * scale
   const rinkH = worldH * scale; // 15 * scale
@@ -382,7 +371,7 @@ export default function Board2D() {
             offsetY={rinkH / 2}
             rotation={boardRotation * 90}
           >
-            {/* コート本体（スマホでは緑枠なし。PCもここだけで十分きれいなので外枠は省略） */}
+            {/* コート本体 */}
             <Rect
               x={0}
               y={0}
