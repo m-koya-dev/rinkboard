@@ -1,5 +1,5 @@
 // src/App.tsx
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import Board2D from "./boards/Board2D";
 import Board3D from "./boards/Board3D";
 import { useBoardStore, useDrawStore } from "./store";
@@ -7,7 +7,23 @@ import type { Mode3D } from "./store";
 
 type ViewMode = "2d" | "3d";
 
-function Header({
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth < 768 : false
+  );
+
+  useEffect(() => {
+    const onR = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener("resize", onR);
+    return () => window.removeEventListener("resize", onR);
+  }, []);
+
+  return isMobile;
+}
+
+function HeaderDesktop({
   viewMode,
   setViewMode,
   mode3D,
@@ -30,8 +46,10 @@ function Header({
   const buttonBase =
     "inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium border border-white/15 text-slate-100 hover:bg-white/10 transition";
 
-  const mode3DBase = "px-2 py-0.5 rounded-full text-[11px] border transition";
-  const mode3DActive = mode3DBase + " bg-sky-500 text-white border-sky-400";
+  const mode3DBase =
+    "px-2 py-0.5 rounded-full text-[11px] border transition";
+  const mode3DActive =
+    mode3DBase + " bg-sky-500 text-white border-sky-400";
   const mode3DInactive =
     mode3DBase +
     " bg-white/5 text-slate-100 border-white/10 hover:bg-white/10";
@@ -53,7 +71,7 @@ function Header({
         </div>
       </div>
 
-      {/* 中央：ビュー切り替え */}
+      {/* 中央：ビュー切り替え + 3D操作モード */}
       <div className="flex flex-col items-center gap-1">
         <div className="bg-slate-800/80 border border-slate-700 rounded-full p-1 flex items-center gap-1">
           <button
@@ -70,7 +88,7 @@ function Header({
           </button>
         </div>
 
-        {/* 3D 表示中だけ操作モード */}
+        {/* 3D表示中だけ、カメラ/駒の操作モードを表示 */}
         {viewMode === "3d" && (
           <div className="flex items-center gap-2 text-[11px] text-slate-300">
             <span className="text-[10px] text-slate-400">3D 操作:</span>
@@ -90,44 +108,40 @@ function Header({
         )}
       </div>
 
-      {/* 右：アクション */}
-      <div className="flex flex-col items-end gap-1">
-        <div className="flex items-center gap-2">
-          <button className={buttonBase} onClick={undo}>
-            ⬅︎ Undo
-          </button>
-          <button className={buttonBase} onClick={redo}>
-            ➝ Redo
-          </button>
-          <button className={buttonBase} onClick={rotateBoard}>
-            ⟳ Rotate
-          </button>
-          <button
-            className={buttonBase}
-            onClick={() => {
-              clearAllLines();
-              resetPositions();
-            }}
-          >
-            Reset
-          </button>
-        </div>
-        <div className="text-gray-400 text-[11px]">
-          RinkBoard - リンクホッケー / ローラーホッケー専用の戦術ボードアプリ
-        </div>
+      {/* 右：アクション系 */}
+      <div className="flex items-center gap-2">
+        <button className={buttonBase} onClick={undo}>
+          ⬅︎ Undo
+        </button>
+        <button className={buttonBase} onClick={redo}>
+          ➝ Redo
+        </button>
+        <button className={buttonBase} onClick={rotateBoard}>
+          ⟳ Rotate
+        </button>
+        <button
+          className={buttonBase}
+          onClick={() => {
+            clearAllLines();
+            resetPositions();
+          }}
+        >
+          Reset
+        </button>
       </div>
     </header>
   );
 }
 
-function Sidebar() {
+function SidebarDesktop() {
   const { activeTool, setTool, penColor, penWidth, setPenColor, setPenWidth } =
     useDrawStore();
 
   const itemBase =
     "w-full flex flex-col items-center gap-1 px-2 py-3 text-[11px] cursor-pointer border-l-2 transition";
   const activeItem =
-    itemBase + " border-emerald-400 bg-emerald-500/10 text-emerald-300";
+    itemBase +
+    " border-emerald-400 bg-emerald-500/10 text-emerald-300";
   const inactiveItem =
     itemBase +
     " border-transparent text-slate-300 hover:bg:white/5 hover:border-slate-600";
@@ -152,6 +166,7 @@ function Sidebar() {
 
   return (
     <aside className="w-20 bg-slate-900/95 border-r border-slate-800 flex flex-col items-stretch pt-3 pb-4 gap-2">
+      {/* メインツール */}
       <div className="flex-1 flex flex-col gap-1">
         <ToolButton id="select" label="Select" icon="🖱" />
         <ToolButton id="pen" label="Pen" icon="✏️" />
@@ -165,20 +180,18 @@ function Sidebar() {
         <div className="flex flex-col gap-1">
           <span className="text-[10px] text-slate-400">Pen color</span>
           <div className="flex gap-1 justify-between">
-            {["#111827", "#ef4444", "#22c55e", "#3b82f6", "#f59e0b"].map(
-              (c) => (
-                <button
-                  key={c}
-                  className={`w-4 h-4 rounded-full border ${
-                    penColor === c
-                      ? "ring-2 ring-emerald-400 border-white"
-                      : "border-slate-500"
-                  }`}
-                  style={{ backgroundColor: c }}
-                  onClick={() => setPenColor(c)}
-                />
-              )
-            )}
+            {["#111827", "#ef4444", "#22c55e", "#3b82f6", "#f59e0b"].map((c) => (
+              <button
+                key={c}
+                className={`w-4 h-4 rounded-full border ${
+                  penColor === c
+                    ? "ring-2 ring-emerald-400 border-white"
+                    : "border-slate-500"
+                }`}
+                style={{ backgroundColor: c }}
+                onClick={() => setPenColor(c)}
+              />
+            ))}
           </div>
         </div>
         <div className="flex flex-col gap-1">
@@ -197,61 +210,198 @@ function Sidebar() {
   );
 }
 
+/**
+ * モバイル専用の下メニューバー
+ */
+function MobileToolbar({
+  viewMode,
+  setViewMode,
+}: {
+  viewMode: ViewMode;
+  setViewMode: (v: ViewMode) => void;
+}) {
+  const {
+    activeTool,
+    setTool,
+    penColor,
+    setPenColor,
+    penWidth,
+    setPenWidth,
+    undo,
+    redo,
+    clearAllLines,
+  } = useDrawStore();
+  const { rotateBoard, resetPositions, mode3D, setMode3D } = useBoardStore();
+
+  const is2d = viewMode === "2d";
+
+  return (
+    <nav className="h-16 bg-slate-900 border-t border-slate-800 flex flex-col text-[11px]">
+      <div className="flex-1 flex items-center justify-between px-2 gap-1">
+        {/* 左：ビュー切替 */}
+        <div className="flex items-center gap-1">
+          <button
+            className={
+              is2d
+                ? "px-2 py-1 rounded-full bg-emerald-500 text-white text-[11px]"
+                : "px-2 py-1 rounded-full bg-slate-800 text-slate-200 text-[11px]"
+            }
+            onClick={() => setViewMode("2d")}
+          >
+            2D
+          </button>
+          <button
+            className={
+              !is2d
+                ? "px-2 py-1 rounded-full bg-emerald-500 text-white text-[11px]"
+                : "px-2 py-1 rounded-full bg-slate-800 text-slate-200 text-[11px]"
+            }
+            onClick={() => setViewMode("3d")}
+          >
+            3D
+          </button>
+        </div>
+
+        {/* 中央：ツール（Select / Pen / Eraser） */}
+        <div className="flex items-center gap-1">
+          {[
+            { id: "select" as const, label: "🖱" },
+            { id: "pen" as const, label: "✏️" },
+            { id: "eraser" as const, label: "🧽" },
+          ].map((t) => (
+            <button
+              key={t.id}
+              className={
+                activeTool === t.id
+                  ? "w-7 h-7 rounded-md bg-emerald-500 text-white flex items-center justify-center"
+                  : "w-7 h-7 rounded-md bg-slate-800 text-slate-200 flex items-center justify-center"
+              }
+              onClick={() => setTool(t.id)}
+            >
+              <span>{t.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* 右：Undo / Redo / Rotate / Reset */}
+        <div className="flex items-center gap-1">
+          <button
+            className="w-7 h-7 rounded-md bg-slate-800 text-slate-200 flex items-center justify-center"
+            onClick={undo}
+          >
+            ↩
+          </button>
+          <button
+            className="w-7 h-7 rounded-md bg-slate-800 text-slate-200 flex items-center justify-center"
+            onClick={redo}
+          >
+            ↪
+          </button>
+          <button
+            className="w-7 h-7 rounded-md bg-slate-800 text-slate-200 flex items-center justify-center"
+            onClick={rotateBoard}
+          >
+            ⟳
+          </button>
+          <button
+            className="w-7 h-7 rounded-md bg-slate-800 text-red-300 flex items-center justify-center"
+            onClick={() => {
+              clearAllLines();
+              resetPositions();
+            }}
+          >
+            ⌫
+          </button>
+        </div>
+      </div>
+
+      {/* 下段：3D操作モード & ペン設定を少しだけ */}
+      <div className="flex items-center justify-between px-2 pb-1 gap-2">
+        {/* 3D 操作モード（3D時だけ意味ある） */}
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] text-slate-400">3D:</span>
+          <button
+            className={
+              mode3D === "camera"
+                ? "px-2 py-0.5 rounded-full bg-sky-500 text-white text-[10px]"
+                : "px-2 py-0.5 rounded-full bg-slate-800 text-slate-200 text-[10px]"
+            }
+            onClick={() => setMode3D("camera")}
+          >
+            Cam
+          </button>
+          <button
+            className={
+              mode3D === "piece"
+                ? "px-2 py-0.5 rounded-full bg-sky-500 text-white text-[10px]"
+                : "px-2 py-0.5 rounded-full bg-slate-800 text-slate-200 text-[10px]"
+            }
+            onClick={() => setMode3D("piece")}
+          >
+            PCS
+          </button>
+        </div>
+
+        {/* ペン色と太さ（簡易） */}
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1">
+            {["#111827", "#ef4444", "#22c55e"].map((c) => (
+              <button
+                key={c}
+                className={`w-4 h-4 rounded-full border ${
+                  penColor === c ? "border-emerald-400" : "border-slate-500"
+                }`}
+                style={{ backgroundColor: c }}
+                onClick={() => setPenColor(c)}
+              />
+            ))}
+          </div>
+          <input
+            type="range"
+            min={1}
+            max={8}
+            value={penWidth}
+            onChange={(e) => setPenWidth(Number(e.target.value))}
+            className="w-16"
+          />
+        </div>
+      </div>
+    </nav>
+  );
+}
+
 export default function App() {
   const [viewMode, setViewMode] = useState<ViewMode>("2d");
   const { mode3D, setMode3D } = useBoardStore();
-
-  // 画面幅からモバイルかどうかを判定
-  const initialMobile =
-    typeof window !== "undefined" ? window.innerWidth < 768 : false;
-
-  const [isMobile, setIsMobile] = useState(initialMobile);
-  // PC: 常に UI 表示 / モバイル: 初期は非表示
-  const [showUI, setShowUI] = useState(!initialMobile);
-
-  useEffect(() => {
-    const onResize = () => {
-      const mobile = window.innerWidth < 768;
-      setIsMobile(mobile);
-      if (!mobile) {
-        setShowUI(true); // PC のときは常に UI を出す
-      }
-    };
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
+  const isMobile = useIsMobile();
 
   return (
-    <div className="w-screen h-screen flex flex-col bg-slate-950 text-slate-100">
-      {/* ヘッダー：PC では常に表示 / モバイルは showUI のときだけ */}
-      {(!isMobile || showUI) && (
-        <Header
-          viewMode={viewMode}
-          setViewMode={setViewMode}
-          mode3D={mode3D}
-          setMode3D={setMode3D}
-        />
+    <div className="w-screen h-screen flex flex-col bg-slate-950 text-slate-100 overflow-hidden">
+      {isMobile ? (
+        // ===== スマホUI：アプリっぽく、リンク中央固定 + 下メニュー =====
+        <>
+          <div className="flex-1 min-h-0">
+            {viewMode === "2d" ? <Board2D /> : <Board3D />}
+          </div>
+          <MobileToolbar viewMode={viewMode} setViewMode={setViewMode} />
+        </>
+      ) : (
+        // ===== PC UI：今まで通りのレイアウト =====
+        <>
+          <HeaderDesktop
+            viewMode={viewMode}
+            setViewMode={setViewMode}
+            mode3D={mode3D}
+            setMode3D={setMode3D}
+          />
+          <div className="flex flex-1 min-h-0">
+            <SidebarDesktop />
+            <main className="flex-1 min-h-0 min-w-0 bg-slate-900">
+              {viewMode === "2d" ? <Board2D /> : <Board3D />}
+            </main>
+          </div>
+        </>
       )}
-
-      {/* 下部レイアウト：左サイドバー + メインボード */}
-      <div className="flex flex-1 min-h-0">
-        {/* サイドバーも同じ条件 */}
-        {(!isMobile || showUI) && <Sidebar />}
-
-        <main className="relative flex-1 min-h-0 min-w-0 bg-slate-900">
-          {viewMode === "2d" ? <Board2D /> : <Board3D />}
-
-          {/* モバイル専用のメニューボタン */}
-          {isMobile && (
-            <button
-              className="md:hidden fixed bottom-3 left-3 z-50 px-3 py-2 rounded-full bg-slate-900/90 border border-slate-600 text-xs text-slate-100 shadow-lg"
-              onClick={() => setShowUI((v) => !v)}
-            >
-              {showUI ? "✕ メニュー" : "☰ メニュー"}
-            </button>
-          )}
-        </main>
-      </div>
     </div>
   );
 }

@@ -4,10 +4,7 @@ import { Stage, Layer, Rect, Line, Circle, Group, Text } from "react-konva";
 import { BOUNDS, useBoardStore, useDrawStore } from "../store";
 
 /**
- * レイアウト計算：
- * - worldW/worldH はリンクの「実寸」
- * - scale は画面に合わせて計算
- * - centerX/centerY は画面の中心（ここにリンクの中心を置く）
+ * レイアウト計算
  */
 function useLayout() {
   const [size, setSize] = useState({
@@ -30,28 +27,40 @@ function useLayout() {
 
   const isMobile = size.w < 768;
 
+  // モバイルでは下部ツールバー分の高さを差し引く（だいたい 72px）
+  const toolbarH = isMobile ? 72 : 0;
+  const stageW = size.w;
+  const stageH = size.h - toolbarH;
+
   // ===== スケール計算 =====
-  // ・リンクの長辺は 30（worldW）
-  // ・縦でも横でも「30×scale」がはみ出さないようにしておけば、
-  //   どの回転でも必ず画面内に収まる
-  const pad = isMobile ? 4 : 40;
-  const maxBoardWorldDim = 30; // 30m が一番長い
+  let scale: number;
 
-  const baseScale =
-    (Math.min(size.w, size.h) - pad * 2) / maxBoardWorldDim;
-
-  // PCは少しだけ余裕を残す、モバイルはめいっぱい
-  const scale = baseScale * (isMobile ? 1.0 : 0.9);
+  if (isMobile) {
+    // モバイル：縦向き前提。短い辺に合わせて「はみ出さず最大限」
+    const pad = 4;
+    const maxBoardWorldDim = 30; // 長辺は 30m
+    const baseScale =
+      (Math.min(stageW, stageH) - pad * 2) / maxBoardWorldDim;
+    scale = baseScale;
+  } else {
+    // PC：以前と同じイメージ（横長で気持ちよく収まる）
+    const pad = 40;
+    scale = Math.min(
+      (stageW - pad * 2) / worldW,
+      (stageH - pad * 2) / worldH
+    );
+  }
 
   const rinkW = worldW * scale; // 30 * scale
   const rinkH = worldH * scale; // 15 * scale
 
-  // 画面中心
-  const centerX = size.w / 2;
-  const centerY = size.h / 2;
+  // Stage 内でのリンク中心位置（常に見える範囲の中央）
+  const centerX = stageW / 2;
+  const centerY = stageH / 2;
 
   return {
-    size,
+    stageW,
+    stageH,
     scale,
     worldW,
     worldH,
@@ -157,7 +166,8 @@ export default function Board2D() {
   const { players, selectPlayer, ball, updateBall, boardRotation } =
     useBoardStore();
   const {
-    size,
+    stageW,
+    stageH,
     scale,
     worldW,
     worldH,
@@ -342,21 +352,19 @@ export default function Board2D() {
   const goalLeftPx = toLocal(BOUNDS.xMin + 1.5, 0);
   const goalRightPx = toLocal(BOUNDS.xMax - 1.5, 0);
 
-  const outerFrameColor = "#22c55e";
   const rinkFill = "#fbe4cf";
   const goalAreaFill = "#f8d2b0";
   const lineColor = "#1e3a8a";
   const lineW = 0.08 * scale;
   const cornerR = 1.5 * scale;
-  const outerMargin = 12;
 
   const panX = isMobile ? 0 : pan.x;
   const panY = isMobile ? 0 : pan.y;
 
   return (
     <Stage
-      width={size.w}
-      height={size.h}
+      width={stageW}
+      height={stageH}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
@@ -374,19 +382,7 @@ export default function Board2D() {
             offsetY={rinkH / 2}
             rotation={boardRotation * 90}
           >
-            {/* 外枠：PCのみ表示、スマホは省略してリンクのみ */}
-            {!isMobile && (
-              <Rect
-                x={-outerMargin}
-                y={-outerMargin}
-                width={rinkW + outerMargin * 2}
-                height={rinkH + outerMargin * 2}
-                fill={outerFrameColor}
-                cornerRadius={cornerR + outerMargin}
-              />
-            )}
-
-            {/* コート本体 */}
+            {/* コート本体（スマホでは緑枠なし。PCもここだけで十分きれいなので外枠は省略） */}
             <Rect
               x={0}
               y={0}
@@ -554,3 +550,4 @@ export default function Board2D() {
     </Stage>
   );
 }
+
