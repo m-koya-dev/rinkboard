@@ -58,9 +58,7 @@ function Header({
           R
         </div>
         <div className="flex flex-col leading-tight">
-          <span className="text-sm font-semibold text-slate-50">
-            RinkBoard
-          </span>
+          <span className="text-sm font-semibold text-slate-50">RinkBoard</span>
           <span className="text-[11px] text-slate-400">
             Roller Hockey Tactics Board
           </span>
@@ -105,12 +103,9 @@ function Header({
 
       {/* 右：アクション系 */}
       <div className="flex items-center gap-2">
-        {/* ★ 追加：アニメーションパネルを開く */}
-        {viewMode === "2d" && (
-          <button className={buttonBase} onClick={onOpenAnimation}>
-            🎞 Animation
-          </button>
-        )}
+        <button className={buttonBase} onClick={onOpenAnimation}>
+          🎞 Animation
+        </button>
 
         <button className={buttonBase} onClick={undo}>
           ⬅︎ Undo
@@ -138,7 +133,6 @@ function Header({
 function Sidebar({ onOpenAnimation }: { onOpenAnimation: () => void }) {
   const { activeTool, setTool, penColor, penWidth, setPenColor, setPenWidth } =
     useDrawStore();
-  const { } = useBoardStore();
 
   const itemBase =
     "w-full flex flex-col items-center gap-1 px-2 py-3 text-[11px] cursor-pointer border-l-2 transition";
@@ -149,23 +143,40 @@ function Sidebar({ onOpenAnimation }: { onOpenAnimation: () => void }) {
     itemBase +
     " border-transparent text-slate-300 hover:bg:white/5 hover:border-slate-600";
 
+  const disabledItem =
+    "w-full flex flex-col items-center gap-1 px-2 py-3 text-[11px] border-l-2 border-transparent text-slate-500 opacity-60 cursor-not-allowed";
+
   const ToolButton = ({
     id,
     label,
     icon,
+    disabled,
   }: {
     id: Parameters<typeof setTool>[0];
     label: string;
     icon: string;
-  }) => (
-    <button
-      className={activeTool === id ? activeItem : inactiveItem}
-      onClick={() => setTool(id)}
-    >
-      <span className="text-lg">{icon}</span>
-      <span>{label}</span>
-    </button>
-  );
+    disabled?: boolean;
+  }) => {
+    if (disabled) {
+      return (
+        <div className={disabledItem} title="Coming soon">
+          <span className="text-lg">{icon}</span>
+          <span>{label}</span>
+          <span className="text-[9px] text-slate-500">soon</span>
+        </div>
+      );
+    }
+
+    return (
+      <button
+        className={activeTool === id ? activeItem : inactiveItem}
+        onClick={() => setTool(id)}
+      >
+        <span className="text-lg">{icon}</span>
+        <span>{label}</span>
+      </button>
+    );
+  };
 
   return (
     <aside className="w-20 bg-slate-900/95 border-r border-slate-800 flex flex-col items-stretch pt-3 pb-4 gap-2">
@@ -173,10 +184,8 @@ function Sidebar({ onOpenAnimation }: { onOpenAnimation: () => void }) {
         <ToolButton id="select" label="Select" icon="🖱" />
         <ToolButton id="pen" label="Pen" icon="✏️" />
         <ToolButton id="eraser" label="Eraser" icon="🧽" />
-        <ToolButton id="arrow" label="Arrow" icon="➡️" />
-        <ToolButton id="text" label="Text" icon="🅣" />
 
-        {/* ★追加：アニメーション（チャプター）パネルを開く */}
+        {/* ✅ アニメーションボタンを「無効化ボタンより上」に移動 */}
         <button
           className={
             "mt-2 w-full flex flex-col items-center gap-1 px-2 py-3 text-[11px] cursor-pointer border-l-2 border-transparent text-slate-300 hover:bg:white/5 hover:border-slate-600 transition"
@@ -187,6 +196,10 @@ function Sidebar({ onOpenAnimation }: { onOpenAnimation: () => void }) {
           <span className="text-lg">🎞</span>
           <span>Anime</span>
         </button>
+
+        {/* ★未実装なので無効化（Anime の下へ） */}
+        <ToolButton id="arrow" label="Arrow" icon="➡️" disabled />
+        <ToolButton id="text" label="Text" icon="🅣" disabled />
       </div>
 
       <div className="border-t border-slate-700 pt-2 px-2 flex flex-col gap-2">
@@ -225,12 +238,7 @@ function Sidebar({ onOpenAnimation }: { onOpenAnimation: () => void }) {
   );
 }
 
-/**
- * ★チャプターUIを「下から出るパネル」に収納する
- * - デフォルトは閉じる（open=false）
- * - 開いたときもリンクが全部消えないように高さを抑える
- * - 画面外タップで閉じる
- */
+/** AnimationPanel / ChapterPlayer は前のまま（省略せず全体に含める） */
 function AnimationPanel({
   open,
   onClose,
@@ -275,20 +283,14 @@ function AnimationPanel({
       saved ? "ring-1 ring-emerald-400/60" : "",
     ].join(" ");
 
-  // パネルの最大高さ：スマホは少し大きめ、PCは控えめ
   const maxH = isMobile ? "max-h-[45vh]" : "max-h-[38vh]";
 
   return (
     <>
-      {/* 背景の薄いオーバーレイ（クリックで閉じる） */}
       {open && (
-        <div
-          className="fixed inset-0 bg-black/25 z-40"
-          onClick={onClose}
-        />
+        <div className="fixed inset-0 bg-black/25 z-40" onClick={onClose} />
       )}
 
-      {/* 下から出るパネル */}
       <div
         className={[
           "fixed left-0 right-0 bottom-0 z-50",
@@ -298,16 +300,13 @@ function AnimationPanel({
       >
         <div className="mx-auto w-full md:max-w-3xl">
           <div className="bg-slate-900/98 border-t border-slate-700 shadow-2xl rounded-t-2xl overflow-hidden">
-            {/* つまみ（スワイプっぽい見た目） */}
             <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800">
               <div className="flex items-center gap-2">
                 <div className="w-10 h-1.5 rounded-full bg-slate-600/70" />
                 <span className="text-sm text-slate-100 font-semibold">
                   Animation / Chapters
                 </span>
-                <span className="text-[11px] text-slate-400">
-                  （最大10 / 2D）
-                </span>
+                <span className="text-[11px] text-slate-400">（最大10）</span>
               </div>
               <button
                 className="text-slate-300 hover:text-white text-sm"
@@ -318,7 +317,6 @@ function AnimationPanel({
               </button>
             </div>
 
-            {/* 中身 */}
             <div className={["px-4 py-3 overflow-auto", maxH].join(" ")}>
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-2">
@@ -371,8 +369,8 @@ function AnimationPanel({
               </div>
 
               <div className="mt-3 text-[11px] text-slate-400 leading-relaxed">
-                ・チャプター切替は<strong>自動セーブ</strong>されます（今の盤面→保存→次へ）<br />
-                ・線もチャプターごとに切り替わります（プレゼン向き）<br />
+                ・3Dでも「駒/ボールの動き」は再生できます（線は2D専用なので3Dでは表示されません）
+                <br />
                 ・閉じるとリンクが全面表示になります
               </div>
             </div>
@@ -517,13 +515,7 @@ export default function App() {
   const [viewMode, setViewMode] = useState<ViewMode>("2d");
   const { mode3D, setMode3D } = useBoardStore();
 
-  // ★チャプターパネル：デフォルトは閉じる
   const [animOpen, setAnimOpen] = useState(false);
-
-  // 3Dへ切り替えたら邪魔なので閉じる
-  useEffect(() => {
-    if (viewMode === "3d") setAnimOpen(false);
-  }, [viewMode]);
 
   return (
     <div className="w-screen h-screen flex flex-col bg-slate-950 text-slate-100">
@@ -544,10 +536,8 @@ export default function App() {
         </main>
       </div>
 
-      {/* ★2Dのときだけ表示 */}
-      {viewMode === "2d" && (
-        <AnimationPanel open={animOpen} onClose={() => setAnimOpen(false)} />
-      )}
+      <AnimationPanel open={animOpen} onClose={() => setAnimOpen(false)} />
     </div>
   );
 }
+

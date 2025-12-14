@@ -78,17 +78,11 @@ function RinkFloor() {
       {/* センターサークル（線だけ） */}
       <mesh rotation-x={-Math.PI / 2} position={[0, 0.035, 0]}>
         <ringGeometry args={[1.5 - 0.04, 1.5 + 0.04, 64]} />
-        <meshStandardMaterial
-          color={lineColor}
-          side={THREE.DoubleSide}
-        />
+        <meshStandardMaterial color={lineColor} side={THREE.DoubleSide} />
       </mesh>
 
       {/* ペナルティエリア塗り（平面） */}
-      <mesh
-        rotation-x={-Math.PI / 2}
-        position={[penaltyCenterLeft, 0.025, 0]}
-      >
+      <mesh rotation-x={-Math.PI / 2} position={[penaltyCenterLeft, 0.025, 0]}>
         <planeGeometry args={[penaltyWidth, penaltyHeight]} />
         <meshStandardMaterial color={goalAreaColor} />
       </mesh>
@@ -102,7 +96,6 @@ function RinkFloor() {
 
       {/* ペナルティ枠（四辺を細い box で描く） */}
       {/* 左側 */}
-      {/* 上辺 */}
       <mesh
         rotation-x={-Math.PI / 2}
         position={[penaltyCenterLeft, 0.03, penaltyHalfH]}
@@ -110,7 +103,6 @@ function RinkFloor() {
         <boxGeometry args={[penaltyWidth, 0.05, 0.01]} />
         <meshStandardMaterial color={lineColor} />
       </mesh>
-      {/* 下辺 */}
       <mesh
         rotation-x={-Math.PI / 2}
         position={[penaltyCenterLeft, 0.03, -penaltyHalfH]}
@@ -118,25 +110,16 @@ function RinkFloor() {
         <boxGeometry args={[penaltyWidth, 0.05, 0.01]} />
         <meshStandardMaterial color={lineColor} />
       </mesh>
-      {/* 左辺 */}
-      <mesh
-        rotation-x={-Math.PI / 2}
-        position={[penaltyBackXLeft, 0.03, 0]}
-      >
+      <mesh rotation-x={-Math.PI / 2} position={[penaltyBackXLeft, 0.03, 0]}>
         <boxGeometry args={[0.05, penaltyHeight, 0.01]} />
         <meshStandardMaterial color={lineColor} />
       </mesh>
-      {/* 右辺 */}
-      <mesh
-        rotation-x={-Math.PI / 2}
-        position={[penaltyFrontXLeft, 0.03, 0]}
-      >
+      <mesh rotation-x={-Math.PI / 2} position={[penaltyFrontXLeft, 0.03, 0]}>
         <boxGeometry args={[0.05, penaltyHeight, 0.01]} />
         <meshStandardMaterial color={lineColor} />
       </mesh>
 
       {/* 右側 */}
-      {/* 上辺 */}
       <mesh
         rotation-x={-Math.PI / 2}
         position={[penaltyCenterRight, 0.03, penaltyHalfH]}
@@ -144,7 +127,6 @@ function RinkFloor() {
         <boxGeometry args={[penaltyWidth, 0.05, 0.01]} />
         <meshStandardMaterial color={lineColor} />
       </mesh>
-      {/* 下辺 */}
       <mesh
         rotation-x={-Math.PI / 2}
         position={[penaltyCenterRight, 0.03, -penaltyHalfH]}
@@ -152,27 +134,19 @@ function RinkFloor() {
         <boxGeometry args={[penaltyWidth, 0.05, 0.01]} />
         <meshStandardMaterial color={lineColor} />
       </mesh>
-      {/* 左辺 */}
-      <mesh
-        rotation-x={-Math.PI / 2}
-        position={[penaltyBackXRight, 0.03, 0]}
-      >
+      <mesh rotation-x={-Math.PI / 2} position={[penaltyBackXRight, 0.03, 0]}>
         <boxGeometry args={[0.05, penaltyHeight, 0.01]} />
         <meshStandardMaterial color={lineColor} />
       </mesh>
-      {/* 右辺 */}
-      <mesh
-        rotation-x={-Math.PI / 2}
-        position={[penaltyFrontXRight, 0.03, 0]}
-      >
+      <mesh rotation-x={-Math.PI / 2} position={[penaltyFrontXRight, 0.03, 0]}>
         <boxGeometry args={[0.05, penaltyHeight, 0.01]} />
         <meshStandardMaterial color={lineColor} />
       </mesh>
 
       {/* ペナルティエリア前のドット（中央のみ・平面リング） */}
       {[
-        [-6, 0], // 左
-        [6, 0],  // 右
+        [-6, 0],
+        [6, 0],
       ].map(([x, z], i) => (
         <mesh
           key={`front-dot-${i}`}
@@ -180,10 +154,7 @@ function RinkFloor() {
           position={[x, 0.04, z]}
         >
           <ringGeometry args={[0.09, 0.13, 24]} />
-          <meshStandardMaterial
-            color={lineColor}
-            side={THREE.DoubleSide}
-          />
+          <meshStandardMaterial color={lineColor} side={THREE.DoubleSide} />
         </mesh>
       ))}
 
@@ -198,10 +169,7 @@ function RinkFloor() {
           position={[x, 0.04, z]}
         >
           <ringGeometry args={[0.12, 0.18, 24]} />
-          <meshStandardMaterial
-            color={lineColor}
-            side={THREE.DoubleSide}
-          />
+          <meshStandardMaterial color={lineColor} side={THREE.DoubleSide} />
         </mesh>
       ))}
     </group>
@@ -212,17 +180,15 @@ function RinkFloor() {
         ゴール（ネット後ろ）
  ============================ */
 function Goal3D({ side, x }: { side: "left" | "right"; x: number }) {
-  const width = 2.0;  // z方向
+  const width = 2.0; // z方向
   const height = 1.2; // y方向
-  const depth = 0.8;  // x方向
+  const depth = 0.8; // x方向
   const postThickness = 0.08;
 
   // ポストはリンク側、ネットはフェンス側（外側）
-  // 左ゴール: 外側は x が BOUNDS.xMin 側（もっとマイナス）
-  // 右ゴール: 外側は x が BOUNDS.xMax 側（もっとプラス）
-  const dir = side === "left" ? -1 : 1;  // ★ここを修正：外側にネット
-  const frontX = x;                      // ポスト位置（リンク側）
-  const backX = x + dir * depth;         // ネット位置（フェンス側）
+  const dir = side === "left" ? -1 : 1;
+  const frontX = x; // ポスト位置（リンク側）
+  const backX = x + dir * depth; // ネット位置（フェンス側）
 
   const frameColor = "#f97316";
   const netColor = "#fefce8";
@@ -241,17 +207,23 @@ function Goal3D({ side, x }: { side: "left" | "right"; x: number }) {
 
       {/* クロスバー（前：リンク側） */}
       <mesh position={[frontX, height, 0]}>
-        <boxGeometry args={[postThickness, postThickness, width + postThickness]} />
+        <boxGeometry
+          args={[postThickness, postThickness, width + postThickness]}
+        />
         <meshStandardMaterial color={frameColor} />
       </mesh>
 
       {/* サイドバー（奥行き） */}
       <mesh position={[(frontX + backX) / 2, height / 2, width / 2]}>
-        <boxGeometry args={[Math.abs(backX - frontX), postThickness, postThickness]} />
+        <boxGeometry
+          args={[Math.abs(backX - frontX), postThickness, postThickness]}
+        />
         <meshStandardMaterial color={frameColor} />
       </mesh>
       <mesh position={[(frontX + backX) / 2, height / 2, -width / 2]}>
-        <boxGeometry args={[Math.abs(backX - frontX), postThickness, postThickness]} />
+        <boxGeometry
+          args={[Math.abs(backX - frontX), postThickness, postThickness]}
+        />
         <meshStandardMaterial color={frameColor} />
       </mesh>
 
@@ -304,7 +276,6 @@ function Player3D({ id, x, y, color, number }: any) {
     e.stopPropagation();
     if (!groupRef.current) return;
 
-    // マウスレイと y=0 平面の交点
     const hit = e.ray.intersectPlane(groundPlane, intersection);
     if (!hit) return;
     const nx = clamp(intersection.x, BOUNDS.xMin + 0.5, BOUNDS.xMax - 0.5);
@@ -323,11 +294,7 @@ function Player3D({ id, x, y, color, number }: any) {
       {selected && (
         <mesh rotation-x={-Math.PI / 2} position={[0, -0.5, 0]}>
           <ringGeometry args={[0.36, 0.46, 32]} />
-          <meshBasicMaterial
-            color={"#10b981"}
-            transparent
-            opacity={0.9}
-          />
+          <meshBasicMaterial color={"#10b981"} transparent opacity={0.9} />
         </mesh>
       )}
       <mesh
@@ -422,8 +389,10 @@ export default function Board3D() {
   const { players, selectPlayer, mode3D } = useBoardStore();
   const onMiss = () => selectPlayer(null);
 
-  const goalXLeft = BOUNDS.xMin + 1.5;
-  const goalXRight = BOUNDS.xMax - 1.5;
+  // ★ここだけ変更：ペナルティエリア後ろの線とゴールポストを揃える
+  // 2Dの見た目に寄せるため、3Dのゴール位置を xMin+2.5 / xMax-2.5 にする
+  const goalXLeft = BOUNDS.xMin + 2.5;
+  const goalXRight = BOUNDS.xMax - 2.5;
 
   return (
     <Canvas
@@ -445,8 +414,6 @@ export default function Board3D() {
         enableZoom
         minPolarAngle={Math.PI / 6}
         maxPolarAngle={Math.PI / 2.1}
-        minAzimuthAngle={-Math.PI / 2} // Z+側の半球のみ
-        maxAzimuthAngle={Math.PI / 2}
         minDistance={10}
         maxDistance={30}
       />
@@ -454,7 +421,7 @@ export default function Board3D() {
       {/* コート */}
       <RinkFloor />
 
-      {/* ゴール（ネットはフェンス側＝外側） */}
+      {/* ゴール（ペナルティ後ろ線に合わせた位置） */}
       <Goal3D side="left" x={goalXLeft} />
       <Goal3D side="right" x={goalXRight} />
 
