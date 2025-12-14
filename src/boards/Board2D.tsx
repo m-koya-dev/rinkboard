@@ -1,7 +1,21 @@
 // src/boards/Board2D.tsx
-import { useEffect, useRef, useState } from "react";
+import React, {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 import { Stage, Layer, Rect, Line, Circle, Group, Text } from "react-konva";
+import type Konva from "konva";
 import { BOUNDS, useBoardStore, useDrawStore } from "../store";
+
+/**
+ * 外部(App)から録画用Canvasを取り出すためのref API
+ */
+export type Board2DHandle = {
+  getCaptureCanvas: () => HTMLCanvasElement | null;
+};
 
 /**
  * レイアウト計算
@@ -32,17 +46,17 @@ function useLayout() {
   const stageW = size.w;
   const stageH = size.h - toolbarH;
 
-  // PCは少し余白あり / モバイルは余白ゼロ
+  // PCは余白あり、モバイルは余白ゼロ（あなたの現行方針）
   const pad = isMobile ? 0 : 40;
   const scale = Math.min(
     (stageW - pad * 2) / worldW,
     (stageH - pad * 2) / worldH
   );
 
-  const rinkW = worldW * scale; // 30 * scale
-  const rinkH = worldH * scale; // 15 * scale
+  const rinkW = worldW * scale;
+  const rinkH = worldH * scale;
 
-  // Stage 内でのリンク中心位置（常に見える範囲の中央）
+  // Stage 内でのリンク中心位置
   const centerX = stageW / 2;
   const centerY = stageH / 2;
 
@@ -129,12 +143,7 @@ function PlayerToken({
           opacity={0.9}
         />
       )}
-      <Circle
-        radius={tokenRadius}
-        fill={color}
-        stroke="#0f172a"
-        strokeWidth={2}
-      />
+      <Circle radius={tokenRadius} fill={color} stroke="#0f172a" strokeWidth={2} />
       {/* 背番号はボード回転に対して常に読みやすい向きに固定 */}
       <Group rotation={-boardRotation * 90}>
         <Text
@@ -150,33 +159,41 @@ function PlayerToken({
   );
 }
 
-export default function Board2D() {
-  const { players, selectPlayer, ball, updateBall, boardRotation } =
-    useBoardStore();
-  const {
-    stageW,
-    stageH,
-    scale,
-    worldW,
-    worldH,
-    rinkW,
-    rinkH,
-    centerX,
-    centerY,
-    isMobile,
-  } = useLayout();
-  const { toLocal, toWorld } = makeConverters(worldW, worldH, scale);
-  const {
-    lines,
-    penEnabled,
-    eraserEnabled,
-    penColor,
-    penWidth,
-    addLine,
-    eraseLine,
-  } = useDrawStore();
+const Board2D = forwardRef<Board2DHandle>(function Board2D(_props, ref) {
+  const { players, selectPlayer, ball, updateBall, boardRotation } = useBoardStore();
+  const { stageW, stageH, scale, worldW, worldH, rinkW, rinkH, centerX, centerY, isMobile } =
+    useLayout();
 
-  const boardRef = useRef<any>(null);
+  const { toLocal, toWorld } = makeConverters(worldW, worldH, scale);
+
+  const { lines, penEnabled, eraserEnabled, penColor, penWidth, addLine, eraseLine } =
+    useDrawStore();
+
+  const stageRef = useRef<Konva.Stage | null>(null);
+  const boardRef = useRef<Konva.Group | null>(null);
+
+  // 外部(App)へ「録画用Canvas」を提供
+  useImperativeHandle(
+    ref,
+    () => ({
+      getCaptureCanvas: () => {
+        const st = stageRef.current;
+        if (!st) return null;
+
+        // Konvaの実体は st.content (HTMLDivElement) の中に canvas が複数あることがある
+        // 基本的に一番上の「scene canvas」を使う（録画に最適）
+        const container = st.content as unknown as HTMLDivElement | null;
+        if (!container) return null;
+
+        const canvases = Array.from(container.querySelectorAll("canvas"));
+        if (canvases.length <= 0) return null;
+
+        // だいたい先頭が描画本体
+        return canvases[0] as HTMLCanvasElement;
+      },
+    }),
+    []
+  );
 
   // ===== Space + ドラッグでパン（PCのみ有効） =====
   const [spacePressed, setSpacePressed] = useState(false);
@@ -236,7 +253,7 @@ export default function Board2D() {
   // ===== ペン描画関係 =====
   const [currentLineWorld, setCurrentLineWorld] = useState<number[]>([]);
 
-  const getLocalFromStage = (stage: any) => {
+  const getLocalFromStage = (stage: Konva.Stage) => {
     const pos = stage.getPointerPosition();
     if (!pos || !boardRef.current) return null;
 
@@ -253,11 +270,10 @@ export default function Board2D() {
     }
     if (!penEnabled) return;
 
-    const stage = e.target.getStage();
+    const stage = e.target.getStage() as Konva.Stage;
     const local = getLocalFromStage(stage);
     if (!local) return;
-    if (local.x < 0 || local.y < 0 || local.x > rinkW || local.y > rinkH)
-      return;
+    if (local.x < 0 || local.y < 0 || local.x > rinkW || local.y > rinkH) return;
 
     const w = toWorld(local.x, local.y);
     setCurrentLineWorld([w.x, w.y]);
@@ -270,11 +286,10 @@ export default function Board2D() {
     }
     if (!penEnabled || currentLineWorld.length === 0) return;
 
-    const stage = e.target.getStage();
+    const stage = e.target.getStage() as Konva.Stage;
     const local = getLocalFromStage(stage);
     if (!local) return;
-    if (local.x < 0 || local.y < 0 || local.x > rinkW || local.y > rinkH)
-      return;
+    if (local.x < 0 || local.y < 0 || local.x > rinkW || local.y > rinkH) return;
 
     const w = toWorld(local.x, local.y);
     setCurrentLineWorld((prev) => [...prev, w.x, w.y]);
@@ -299,7 +314,7 @@ export default function Board2D() {
     setCurrentLineWorld([]);
   };
 
-  // ===== 駒・ボールのサイズ =====
+  // ===== 駒・ボールのサイズ（画面に追従）=====
   const tokenRadius = Math.max(10, scale * 0.55);
   const tokenFontSize = tokenRadius * 1.2;
 
@@ -319,14 +334,8 @@ export default function Board2D() {
   const penaltyHeightPx = 6 * scale;
   const penaltyWidthPx = (penaltyFrontXLeft - penaltyBackXLeft) * scale;
 
-  const penaltyCenterLeftPx = toLocal(
-    (penaltyBackXLeft + penaltyFrontXLeft) / 2,
-    0
-  );
-  const penaltyCenterRightPx = toLocal(
-    (penaltyBackXRight + penaltyFrontXRight) / 2,
-    0
-  );
+  const penaltyCenterLeftPx = toLocal((penaltyBackXLeft + penaltyFrontXLeft) / 2, 0);
+  const penaltyCenterRightPx = toLocal((penaltyBackXRight + penaltyFrontXRight) / 2, 0);
 
   const pkLeftPx = toLocal(penaltyFrontXLeft, 0);
   const pkRightPx = toLocal(penaltyFrontXRight, 0);
@@ -341,21 +350,26 @@ export default function Board2D() {
   const goalLeftPx = toLocal(BOUNDS.xMin + 1.5, 0);
   const goalRightPx = toLocal(BOUNDS.xMax - 1.5, 0);
 
+  // ===== 色・線 =====
+  const outerFrameColor = "#22c55e";
   const rinkFill = "#fbe4cf";
   const goalAreaFill = "#f8d2b0";
   const lineColor = "#1e3a8a";
   const lineW = 0.08 * scale;
   const cornerR = 1.5 * scale;
 
-  // ===== PC用：外枠（緑） =====
-  const outerFrameColor = "#22c55e";
-  const outerMargin = 12; // 外枠の太さ（好みで 10〜18 くらいで調整OK）
+  // PCだけ緑枠を付ける（スマホは無し）
+  const showOuterFrame = !isMobile;
+  const outerMargin = 12;
 
   const panX = isMobile ? 0 : pan.x;
   const panY = isMobile ? 0 : pan.y;
 
   return (
     <Stage
+      ref={(node) => {
+        stageRef.current = node as unknown as Konva.Stage | null;
+      }}
       width={stageW}
       height={stageH}
       onMouseDown={handleMouseDown}
@@ -368,15 +382,17 @@ export default function Board2D() {
         <Group x={panX} y={panY}>
           {/* リンク全体（centerX, centerY に配置） */}
           <Group
-            ref={boardRef}
+            ref={(node) => {
+              boardRef.current = node as unknown as Konva.Group | null;
+            }}
             x={centerX}
             y={centerY}
             offsetX={rinkW / 2}
             offsetY={rinkH / 2}
             rotation={boardRotation * 90}
           >
-            {/* PCのみ：外側の緑枠 */}
-            {!isMobile && (
+            {/* PCのみ外枠（緑） */}
+            {showOuterFrame && (
               <Rect
                 x={-outerMargin}
                 y={-outerMargin}
@@ -443,12 +459,7 @@ export default function Board2D() {
 
             {/* PKスポット */}
             <Circle x={pkLeftPx.x} y={pkLeftPx.y} radius={pkR} fill={lineColor} />
-            <Circle
-              x={pkRightPx.x}
-              y={pkRightPx.y}
-              radius={pkR}
-              fill={lineColor}
-            />
+            <Circle x={pkRightPx.x} y={pkRightPx.y} radius={pkR} fill={lineColor} />
 
             {/* ゴール */}
             {[goalLeftPx, goalRightPx].map((g, idx) => (
@@ -468,10 +479,10 @@ export default function Board2D() {
             {lines.map((ln, i) => (
               <Line
                 key={i}
-                points={ln.points.flatMap((v, idx) =>
+                points={ln.points.flatMap((_, idx) =>
                   idx % 2 === 0
                     ? toLocal(ln.points[idx], ln.points[idx + 1]).x
-                    : toLocal(ln.points[idx - 1], v).y
+                    : toLocal(ln.points[idx - 1], ln.points[idx]).y
                 )}
                 stroke={ln.color}
                 strokeWidth={ln.width}
@@ -489,10 +500,10 @@ export default function Board2D() {
             {/* 描き途中の線 */}
             {currentLineWorld.length > 0 && (
               <Line
-                points={currentLineWorld.flatMap((v, idx) =>
+                points={currentLineWorld.flatMap((_, idx) =>
                   idx % 2 === 0
                     ? toLocal(currentLineWorld[idx], currentLineWorld[idx + 1]).x
-                    : toLocal(currentLineWorld[idx - 1], v).y
+                    : toLocal(currentLineWorld[idx - 1], currentLineWorld[idx]).y
                 )}
                 stroke={penColor}
                 strokeWidth={penWidth}
@@ -540,4 +551,7 @@ export default function Board2D() {
       </Layer>
     </Stage>
   );
-}
+});
+
+export default Board2D;
+

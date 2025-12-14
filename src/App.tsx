@@ -1,6 +1,6 @@
 // src/App.tsx
-import { useEffect, useMemo, useState } from "react";
-import Board2D from "./boards/Board2D";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Board2D, { type Board2DHandle } from "./boards/Board2D";
 import Board3D from "./boards/Board3D";
 import { useBoardStore, useDrawStore } from "./store";
 import type { Mode3D } from "./store";
@@ -15,6 +15,33 @@ function useIsMobile() {
     return () => window.removeEventListener("resize", onR);
   }, []);
   return w < 768;
+}
+
+/**
+ * MediaRecorder の mimeType を「使えるもの」から選ぶ
+ * - mp4 が使えるなら mp4（環境による）
+ * - ダメなら webm（Chromeでほぼ確実）
+ */
+function pickSupportedMimeType() {
+  const candidates = [
+    // MP4(H.264) は環境次第で非対応
+    'video/mp4;codecs="avc1.42E01E,mp4a.40.2"',
+    "video/mp4",
+    // WebM はかなり安定
+    'video/webm;codecs="vp9,opus"',
+    'video/webm;codecs="vp8,opus"',
+    "video/webm",
+  ];
+
+  for (const c of candidates) {
+    if ((window as any).MediaRecorder?.isTypeSupported?.(c)) return c;
+  }
+  return ""; // 空ならブラウザデフォルト
+}
+
+function extFromMime(mime: string) {
+  if (mime.includes("mp4")) return "mp4";
+  return "webm";
 }
 
 function Header({
@@ -33,8 +60,7 @@ function Header({
   const { rotateBoard, resetPositions } = useBoardStore();
   const { undo, redo, clearAllLines } = useDrawStore();
 
-  const tabBase =
-    "px-3 py-1 rounded-full text-sm font-medium border transition";
+  const tabBase = "px-3 py-1 rounded-full text-sm font-medium border transition";
   const activeTab = tabBase + " bg-emerald-500 text-white border-emerald-500";
   const inactiveTab =
     tabBase + " bg-white/5 text-slate-100 border-white/10 hover:bg-white/10";
@@ -42,13 +68,10 @@ function Header({
   const buttonBase =
     "inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium border border-white/15 text-slate-100 hover:bg-white/10 transition";
 
-  const mode3DBase =
-    "px-2 py-0.5 rounded-full text-[11px] border transition";
-  const mode3DActive =
-    mode3DBase + " bg-sky-500 text-white border-sky-400";
+  const mode3DBase = "px-2 py-0.5 rounded-full text-[11px] border transition";
+  const mode3DActive = mode3DBase + " bg-sky-500 text-white border-sky-400";
   const mode3DInactive =
-    mode3DBase +
-    " bg-white/5 text-slate-100 border-white/10 hover:bg-white/10";
+    mode3DBase + " bg-white/5 text-slate-100 border-white/10 hover:bg-white/10";
 
   return (
     <header className="flex items-center justify-between px-4 py-2 bg-slate-900/95 border-b border-slate-800">
@@ -59,25 +82,17 @@ function Header({
         </div>
         <div className="flex flex-col leading-tight">
           <span className="text-sm font-semibold text-slate-50">RinkBoard</span>
-          <span className="text-[11px] text-slate-400">
-            Roller Hockey Tactics Board
-          </span>
+          <span className="text-[11px] text-slate-400">Roller Hockey Tactics Board</span>
         </div>
       </div>
 
       {/* 中央：ビュー切り替え + 3D操作モード */}
       <div className="flex flex-col items-center gap-1">
         <div className="bg-slate-800/80 border border-slate-700 rounded-full p-1 flex items-center gap-1">
-          <button
-            className={viewMode === "2d" ? activeTab : inactiveTab}
-            onClick={() => setViewMode("2d")}
-          >
+          <button className={viewMode === "2d" ? activeTab : inactiveTab} onClick={() => setViewMode("2d")}>
             2D View
           </button>
-          <button
-            className={viewMode === "3d" ? activeTab : inactiveTab}
-            onClick={() => setViewMode("3d")}
-          >
+          <button className={viewMode === "3d" ? activeTab : inactiveTab} onClick={() => setViewMode("3d")}>
             3D View
           </button>
         </div>
@@ -131,17 +146,13 @@ function Header({
 }
 
 function Sidebar({ onOpenAnimation }: { onOpenAnimation: () => void }) {
-  const { activeTool, setTool, penColor, penWidth, setPenColor, setPenWidth } =
-    useDrawStore();
+  const { activeTool, setTool, penColor, penWidth, setPenColor, setPenWidth } = useDrawStore();
 
   const itemBase =
     "w-full flex flex-col items-center gap-1 px-2 py-3 text-[11px] cursor-pointer border-l-2 transition";
-  const activeItem =
-    itemBase +
-    " border-emerald-400 bg-emerald-500/10 text-emerald-300";
+  const activeItem = itemBase + " border-emerald-400 bg-emerald-500/10 text-emerald-300";
   const inactiveItem =
-    itemBase +
-    " border-transparent text-slate-300 hover:bg:white/5 hover:border-slate-600";
+    itemBase + " border-transparent text-slate-300 hover:bg:white/5 hover:border-slate-600";
 
   const disabledItem =
     "w-full flex flex-col items-center gap-1 px-2 py-3 text-[11px] border-l-2 border-transparent text-slate-500 opacity-60 cursor-not-allowed";
@@ -168,10 +179,7 @@ function Sidebar({ onOpenAnimation }: { onOpenAnimation: () => void }) {
     }
 
     return (
-      <button
-        className={activeTool === id ? activeItem : inactiveItem}
-        onClick={() => setTool(id)}
-      >
+      <button className={activeTool === id ? activeItem : inactiveItem} onClick={() => setTool(id)}>
         <span className="text-lg">{icon}</span>
         <span>{label}</span>
       </button>
@@ -185,7 +193,7 @@ function Sidebar({ onOpenAnimation }: { onOpenAnimation: () => void }) {
         <ToolButton id="pen" label="Pen" icon="✏️" />
         <ToolButton id="eraser" label="Eraser" icon="🧽" />
 
-        {/* ✅ アニメーションボタンを「無効化ボタンより上」に移動 */}
+        {/* ✅ 指定どおり：Anime(アニメーション)を disabled より上に配置 */}
         <button
           className={
             "mt-2 w-full flex flex-col items-center gap-1 px-2 py-3 text-[11px] cursor-pointer border-l-2 border-transparent text-slate-300 hover:bg:white/5 hover:border-slate-600 transition"
@@ -197,7 +205,7 @@ function Sidebar({ onOpenAnimation }: { onOpenAnimation: () => void }) {
           <span>Anime</span>
         </button>
 
-        {/* ★未実装なので無効化（Anime の下へ） */}
+        {/* ★未実装なので無効化（Animeより下へ） */}
         <ToolButton id="arrow" label="Arrow" icon="➡️" disabled />
         <ToolButton id="text" label="Text" icon="🅣" disabled />
       </div>
@@ -206,20 +214,16 @@ function Sidebar({ onOpenAnimation }: { onOpenAnimation: () => void }) {
         <div className="flex flex-col gap-1">
           <span className="text-[10px] text-slate-400">Pen color</span>
           <div className="flex gap-1 justify-between">
-            {["#111827", "#ef4444", "#22c55e", "#3b82f6", "#f59e0b"].map(
-              (c) => (
-                <button
-                  key={c}
-                  className={`w-4 h-4 rounded-full border ${
-                    penColor === c
-                      ? "ring-2 ring-emerald-400 border-white"
-                      : "border-slate-500"
-                  }`}
-                  style={{ backgroundColor: c }}
-                  onClick={() => setPenColor(c)}
-                />
-              )
-            )}
+            {["#111827", "#ef4444", "#22c55e", "#3b82f6", "#f59e0b"].map((c) => (
+              <button
+                key={c}
+                className={`w-4 h-4 rounded-full border ${
+                  penColor === c ? "ring-2 ring-emerald-400 border-white" : "border-slate-500"
+                }`}
+                style={{ backgroundColor: c }}
+                onClick={() => setPenColor(c)}
+              />
+            ))}
           </div>
         </div>
         <div className="flex flex-col gap-1">
@@ -238,13 +242,19 @@ function Sidebar({ onOpenAnimation }: { onOpenAnimation: () => void }) {
   );
 }
 
-/** AnimationPanel / ChapterPlayer は前のまま（省略せず全体に含める） */
+/** AnimationPanel / ChapterPlayer は「完全版」 */
 function AnimationPanel({
   open,
   onClose,
+  viewMode,
+  onRecord2D,
+  recording,
 }: {
   open: boolean;
   onClose: () => void;
+  viewMode: ViewMode;
+  onRecord2D: () => void;
+  recording: boolean;
 }) {
   const isMobile = useIsMobile();
   const {
@@ -274,6 +284,10 @@ function AnimationPanel({
   const danger =
     "px-3 py-1 rounded-md text-xs font-medium bg-rose-500 text-white hover:bg-rose-400 transition";
 
+  const recordBtn = recording
+    ? "px-3 py-1 rounded-md text-xs font-semibold bg-rose-500 text-white hover:bg-rose-400 transition"
+    : "px-3 py-1 rounded-md text-xs font-semibold bg-white/10 text-slate-100 border border-white/15 hover:bg-white/15 transition";
+
   const slotBtn = (active: boolean, saved: boolean) =>
     [
       "w-8 h-8 rounded-md text-xs font-semibold border transition",
@@ -287,9 +301,7 @@ function AnimationPanel({
 
   return (
     <>
-      {open && (
-        <div className="fixed inset-0 bg-black/25 z-40" onClick={onClose} />
-      )}
+      {open && <div className="fixed inset-0 bg-black/25 z-40" onClick={onClose} />}
 
       <div
         className={[
@@ -303,16 +315,10 @@ function AnimationPanel({
             <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800">
               <div className="flex items-center gap-2">
                 <div className="w-10 h-1.5 rounded-full bg-slate-600/70" />
-                <span className="text-sm text-slate-100 font-semibold">
-                  Animation / Chapters
-                </span>
+                <span className="text-sm text-slate-100 font-semibold">Animation / Chapters</span>
                 <span className="text-[11px] text-slate-400">（最大10）</span>
               </div>
-              <button
-                className="text-slate-300 hover:text-white text-sm"
-                onClick={onClose}
-                title="Close"
-              >
+              <button className="text-slate-300 hover:text-white text-sm" onClick={onClose} title="Close">
                 ✕
               </button>
             </div>
@@ -327,7 +333,7 @@ function AnimationPanel({
                   </span>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <button className={primary} onClick={saveChapterAtActive}>
                     Save
                   </button>
@@ -342,6 +348,17 @@ function AnimationPanel({
                     </button>
                   )}
 
+                  {/* 2D録画 */}
+                  <button
+                    className={recordBtn}
+                    onClick={onRecord2D}
+                    disabled={viewMode !== "2d"}
+                    title={viewMode !== "2d" ? "2D表示でのみ録画できます" : "録画→自動再生→保存"}
+                    style={viewMode !== "2d" ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
+                  >
+                    {recording ? "⏺ Recording..." : "⏺ Record (2D)"}
+                  </button>
+
                   <button className={danger} onClick={clearChapters}>
                     Clear
                   </button>
@@ -355,11 +372,7 @@ function AnimationPanel({
                     <button
                       key={i}
                       className={slotBtn(i === activeChapterIndex, saved)}
-                      title={
-                        saved
-                          ? `Saved: Chapter ${i + 1}`
-                          : `Empty: Chapter ${i + 1}`
-                      }
+                      title={saved ? `Saved: Chapter ${i + 1}` : `Empty: Chapter ${i + 1}`}
                       onClick={() => switchChapter(i)}
                     >
                       {i + 1}
@@ -369,6 +382,8 @@ function AnimationPanel({
               </div>
 
               <div className="mt-3 text-[11px] text-slate-400 leading-relaxed">
+                ・2D録画は「盤面キャンバス」をそのまま動画化します（環境によりMP4不可の場合はWebMで保存）
+                <br />
                 ・3Dでも「駒/ボールの動き」は再生できます（線は2D専用なので3Dでは表示されません）
                 <br />
                 ・閉じるとリンクが全面表示になります
@@ -382,13 +397,8 @@ function AnimationPanel({
 }
 
 function ChapterPlayer() {
-  const {
-    chapters,
-    isPlayingChapters,
-    stopPlayChapters,
-    applySnapshotInstant,
-    setPlayersAndBall,
-  } = useBoardStore();
+  const { chapters, isPlayingChapters, stopPlayChapters, applySnapshotInstant, setPlayersAndBall } =
+    useBoardStore();
 
   const slots = useMemo(() => {
     const fixed = Array(10).fill(null) as (typeof chapters[number] | null)[];
@@ -437,8 +447,7 @@ function ChapterPlayer() {
         if (cancelled) return;
 
         const t = Math.min(1, (now - start) / duration);
-        const eased =
-          t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 
         const nextPlayers = to.players.map((tp) => {
           const fp = fromMap.get(tp.id) ?? tp;
@@ -500,22 +509,101 @@ function ChapterPlayer() {
     return () => {
       cancelled = true;
     };
-  }, [
-    isPlayingChapters,
-    slots,
-    stopPlayChapters,
-    applySnapshotInstant,
-    setPlayersAndBall,
-  ]);
+  }, [isPlayingChapters, slots, stopPlayChapters, applySnapshotInstant, setPlayersAndBall]);
 
   return null;
 }
 
 export default function App() {
   const [viewMode, setViewMode] = useState<ViewMode>("2d");
-  const { mode3D, setMode3D } = useBoardStore();
+  const { mode3D, setMode3D, isPlayingChapters, startPlayChapters, stopPlayChapters } = useBoardStore();
 
   const [animOpen, setAnimOpen] = useState(false);
+
+  // 録画：Board2Dのキャンバス参照
+  const board2DRef = useRef<Board2DHandle | null>(null);
+
+  // 録画状態
+  const [recording, setRecording] = useState(false);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<BlobPart[]>([]);
+  const mimeRef = useRef<string>("");
+
+  // 「再生が終わったら録画停止」の検知用
+  const prevPlayingRef = useRef<boolean>(false);
+  useEffect(() => {
+    const prev = prevPlayingRef.current;
+    prevPlayingRef.current = isPlayingChapters;
+
+    // true -> false に落ちた（再生終了）
+    if (prev && !isPlayingChapters) {
+      if (recording) {
+        recorderRef.current?.stop();
+      }
+    }
+  }, [isPlayingChapters, recording]);
+
+  const stopAndSave = () => {
+    const mime = mimeRef.current || "video/webm";
+    const ext = extFromMime(mime);
+
+    const blob = new Blob(chunksRef.current, { type: mime });
+    chunksRef.current = [];
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `rinkboard-animation.${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  };
+
+  const startRecord2DAndPlay = () => {
+    if (viewMode !== "2d") return;
+    if (recording) return;
+
+    const canvas = board2DRef.current?.getCaptureCanvas();
+    if (!canvas) {
+      alert("録画用のCanvasが取得できませんでした（2D表示で試してください）");
+      return;
+    }
+
+    const stream = canvas.captureStream(60); // 60fps
+    const mime = pickSupportedMimeType();
+    mimeRef.current = mime;
+
+    chunksRef.current = [];
+
+    let recorder: MediaRecorder;
+    try {
+      recorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+    } catch (e) {
+      console.error(e);
+      alert("このブラウザでは録画できません（MediaRecorder非対応の可能性）");
+      return;
+    }
+
+    recorderRef.current = recorder;
+
+    recorder.ondataavailable = (ev) => {
+      if (ev.data && ev.data.size > 0) chunksRef.current.push(ev.data);
+    };
+
+    recorder.onstop = () => {
+      setRecording(false);
+      stopAndSave();
+    };
+
+    recorder.start(250); // 250msごとにチャンク化
+    setRecording(true);
+
+    // 録画開始したら、そのままアニメ再生
+    if (isPlayingChapters) stopPlayChapters();
+    startPlayChapters();
+  };
 
   return (
     <div className="w-screen h-screen flex flex-col bg-slate-950 text-slate-100">
@@ -532,11 +620,17 @@ export default function App() {
       <div className="flex flex-1 min-h-0">
         <Sidebar onOpenAnimation={() => setAnimOpen(true)} />
         <main className="flex-1 min-h-0 min-w-0 bg-slate-900 relative">
-          {viewMode === "2d" ? <Board2D /> : <Board3D />}
+          {viewMode === "2d" ? <Board2D ref={board2DRef} /> : <Board3D />}
         </main>
       </div>
 
-      <AnimationPanel open={animOpen} onClose={() => setAnimOpen(false)} />
+      <AnimationPanel
+        open={animOpen}
+        onClose={() => setAnimOpen(false)}
+        viewMode={viewMode}
+        onRecord2D={startRecord2DAndPlay}
+        recording={recording}
+      />
     </div>
   );
 }
