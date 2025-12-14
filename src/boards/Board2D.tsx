@@ -1,5 +1,5 @@
 // src/boards/Board2D.tsx
-import React, {
+import  {
   forwardRef,
   useEffect,
   useImperativeHandle,
