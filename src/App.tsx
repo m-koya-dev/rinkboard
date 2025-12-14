@@ -6,6 +6,7 @@ import { useBoardStore, useDrawStore } from "./store";
 import type { Mode3D } from "./store";
 
 type ViewMode = "2d" | "3d";
+type PlaybackSpeed = 0.5 | 1 | 2;
 
 function useIsMobile() {
   const [w, setW] = useState(window.innerWidth);
@@ -35,7 +36,6 @@ function pickBestMimeType(): { mimeType?: string; ext: "mp4" | "webm" } {
     "video/webm",
   ];
 
-  // MediaRecorderが無い環境の保険
   if (typeof MediaRecorder === "undefined") {
     return { ext: "webm" };
   }
@@ -47,7 +47,6 @@ function pickBestMimeType(): { mimeType?: string; ext: "mp4" | "webm" } {
     if ((MediaRecorder as any).isTypeSupported?.(m)) return { mimeType: m, ext: "webm" };
   }
 
-  // mimeType未指定で作る（ブラウザが勝手に選ぶ）
   return { ext: "webm" };
 }
 
@@ -76,8 +75,7 @@ function Header({
   const { rotateBoard, resetPositions } = useBoardStore();
   const { undo, redo, clearAllLines } = useDrawStore();
 
-  const tabBase =
-    "px-3 py-1 rounded-full text-sm font-medium border transition";
+  const tabBase = "px-3 py-1 rounded-full text-sm font-medium border transition";
   const activeTab = tabBase + " bg-emerald-500 text-white border-emerald-500";
   const inactiveTab =
     tabBase + " bg-white/5 text-slate-100 border-white/10 hover:bg-white/10";
@@ -85,12 +83,10 @@ function Header({
   const buttonBase =
     "inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium border border-white/15 text-slate-100 hover:bg-white/10 transition";
 
-  const mode3DBase =
-    "px-2 py-0.5 rounded-full text-[11px] border transition";
+  const mode3DBase = "px-2 py-0.5 rounded-full text-[11px] border transition";
   const mode3DActive = mode3DBase + " bg-sky-500 text-white border-sky-400";
   const mode3DInactive =
-    mode3DBase +
-    " bg-white/5 text-slate-100 border-white/10 hover:bg-white/10";
+    mode3DBase + " bg-white/5 text-slate-100 border-white/10 hover:bg-white/10";
 
   return (
     <header className="flex items-center justify-between px-4 py-2 bg-slate-900/95 border-b border-slate-800">
@@ -101,9 +97,7 @@ function Header({
         </div>
         <div className="flex flex-col leading-tight">
           <span className="text-sm font-semibold text-slate-50">RinkBoard</span>
-          <span className="text-[11px] text-slate-400">
-            Roller Hockey Tactics Board
-          </span>
+          <span className="text-[11px] text-slate-400">Roller Hockey Tactics Board</span>
         </div>
       </div>
 
@@ -179,11 +173,9 @@ function Sidebar({ onOpenAnimation }: { onOpenAnimation: () => void }) {
   const itemBase =
     "w-full flex flex-col items-center gap-1 px-2 py-3 text-[11px] cursor-pointer border-l-2 transition";
   const activeItem =
-    itemBase +
-    " border-emerald-400 bg-emerald-500/10 text-emerald-300";
+    itemBase + " border-emerald-400 bg-emerald-500/10 text-emerald-300";
   const inactiveItem =
-    itemBase +
-    " border-transparent text-slate-300 hover:bg:white/5 hover:border-slate-600";
+    itemBase + " border-transparent text-slate-300 hover:bg:white/5 hover:border-slate-600";
 
   const disabledItem =
     "w-full flex flex-col items-center gap-1 px-2 py-3 text-[11px] border-l-2 border-transparent text-slate-500 opacity-60 cursor-not-allowed";
@@ -227,7 +219,7 @@ function Sidebar({ onOpenAnimation }: { onOpenAnimation: () => void }) {
         <ToolButton id="pen" label="Pen" icon="✏️" />
         <ToolButton id="eraser" label="Eraser" icon="🧽" />
 
-        {/* ✅ ここ：Animeボタンを “無効ボタン（Arrow/Text）より上” に戻す */}
+        {/* ✅ Animeボタンは無効（Arrow/Text）より上 */}
         <button
           className={
             "mt-2 w-full flex flex-col items-center gap-1 px-2 py-3 text-[11px] cursor-pointer border-l-2 border-transparent text-slate-300 hover:bg:white/5 hover:border-slate-600 transition"
@@ -239,7 +231,7 @@ function Sidebar({ onOpenAnimation }: { onOpenAnimation: () => void }) {
           <span>Anime</span>
         </button>
 
-        {/* ★未実装なので無効化（位置は下のまま） */}
+        {/* ★未実装なので無効化 */}
         <ToolButton id="arrow" label="Arrow" icon="➡️" disabled />
         <ToolButton id="text" label="Text" icon="🅣" disabled />
       </div>
@@ -248,20 +240,16 @@ function Sidebar({ onOpenAnimation }: { onOpenAnimation: () => void }) {
         <div className="flex flex-col gap-1">
           <span className="text-[10px] text-slate-400">Pen color</span>
           <div className="flex gap-1 justify-between">
-            {["#111827", "#ef4444", "#22c55e", "#3b82f6", "#f59e0b"].map(
-              (c) => (
-                <button
-                  key={c}
-                  className={`w-4 h-4 rounded-full border ${
-                    penColor === c
-                      ? "ring-2 ring-emerald-400 border-white"
-                      : "border-slate-500"
-                  }`}
-                  style={{ backgroundColor: c }}
-                  onClick={() => setPenColor(c)}
-                />
-              )
-            )}
+            {["#111827", "#ef4444", "#22c55e", "#3b82f6", "#f59e0b"].map((c) => (
+              <button
+                key={c}
+                className={`w-4 h-4 rounded-full border ${
+                  penColor === c ? "ring-2 ring-emerald-400 border-white" : "border-slate-500"
+                }`}
+                style={{ backgroundColor: c }}
+                onClick={() => setPenColor(c)}
+              />
+            ))}
           </div>
         </div>
         <div className="flex flex-col gap-1">
@@ -287,6 +275,8 @@ function AnimationPanel({
   onStopRecord,
   recording,
   recordExt,
+  playbackSpeed,
+  setPlaybackSpeed,
 }: {
   open: boolean;
   onClose: () => void;
@@ -294,6 +284,8 @@ function AnimationPanel({
   onStopRecord: () => void;
   recording: boolean;
   recordExt: "mp4" | "webm";
+  playbackSpeed: PlaybackSpeed;
+  setPlaybackSpeed: (s: PlaybackSpeed) => void;
 }) {
   const isMobile = useIsMobile();
   const {
@@ -336,7 +328,6 @@ function AnimationPanel({
 
   const maxH = isMobile ? "max-h-[45vh]" : "max-h-[38vh]";
 
-  // ===== Export / Import (JSON) =====
   const [toast, setToast] = useState<string | null>(null);
 
   const downloadJSON = () => {
@@ -346,10 +337,7 @@ function AnimationPanel({
       const blob = new Blob([json], { type: "application/json" });
       downloadBlob(
         blob,
-        `rinkboard-${new Date()
-          .toISOString()
-          .slice(0, 19)
-          .replace(/[:T]/g, "-")}.json`
+        `rinkboard-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.json`
       );
       setToast("JSONを書き出しました（ダウンロード）");
       setTimeout(() => setToast(null), 2000);
@@ -373,11 +361,17 @@ function AnimationPanel({
     }
   };
 
+  const speedBtn = (s: PlaybackSpeed) =>
+    [
+      "px-2 py-1 rounded-md text-xs border transition",
+      s === playbackSpeed
+        ? "bg-emerald-400 text-slate-900 border-emerald-300"
+        : "bg-white/5 text-slate-100 border-white/10 hover:bg-white/10",
+    ].join(" ");
+
   return (
     <>
-      {open && (
-        <div className="fixed inset-0 bg-black/25 z-40" onClick={onClose} />
-      )}
+      {open && <div className="fixed inset-0 bg-black/25 z-40" onClick={onClose} />}
 
       <div
         className={[
@@ -442,6 +436,27 @@ function AnimationPanel({
                 </div>
               </div>
 
+              {/* ✅ 追加：再生速度 */}
+              <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-300">Speed</span>
+                  <span className="text-[11px] text-slate-500">
+                    {playbackSpeed}x
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button className={speedBtn(0.5)} onClick={() => setPlaybackSpeed(0.5)}>
+                    0.5x
+                  </button>
+                  <button className={speedBtn(1)} onClick={() => setPlaybackSpeed(1)}>
+                    1x
+                  </button>
+                  <button className={speedBtn(2)} onClick={() => setPlaybackSpeed(2)}>
+                    2x
+                  </button>
+                </div>
+              </div>
+
               <div className="mt-3 flex items-center gap-2 flex-wrap">
                 {Array.from({ length: 10 }).map((_, i) => {
                   const saved = !!slots[i];
@@ -449,11 +464,7 @@ function AnimationPanel({
                     <button
                       key={i}
                       className={slotBtn(i === activeChapterIndex, saved)}
-                      title={
-                        saved
-                          ? `Saved: Chapter ${i + 1}`
-                          : `Empty: Chapter ${i + 1}`
-                      }
+                      title={saved ? `Saved: Chapter ${i + 1}` : `Empty: Chapter ${i + 1}`}
                       onClick={() => switchChapter(i)}
                     >
                       {i + 1}
@@ -462,7 +473,7 @@ function AnimationPanel({
                 })}
               </div>
 
-              {/* ===== 追加：録画（できるだけMP4） ===== */}
+              {/* 録画 */}
               <div className="mt-4 flex items-center gap-2 flex-wrap">
                 {!recording ? (
                   <button className={baseBtn} onClick={onStartRecord}>
@@ -473,7 +484,6 @@ function AnimationPanel({
                     ■ Stop & Save
                   </button>
                 )}
-
                 <span className="text-[11px] text-slate-500">
                   ※MP4はブラウザ対応次第。非対応環境はWebMで保存されます。
                 </span>
@@ -513,7 +523,7 @@ function AnimationPanel({
   );
 }
 
-function ChapterPlayer() {
+function ChapterPlayer({ playbackSpeed }: { playbackSpeed: PlaybackSpeed }) {
   const {
     chapters,
     isPlayingChapters,
@@ -543,7 +553,11 @@ function ChapterPlayer() {
     let cancelled = false;
 
     const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-    const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+    // speed: 2x => 時間を1/2、0.5x => 時間を2倍
+    const timeScale = 1 / playbackSpeed;
+    const sleep = (ms: number) =>
+      new Promise<void>((r) => setTimeout(r, Math.max(0, ms * timeScale)));
 
     const animateBetween = async (fromIdx: number, toIdx: number) => {
       const from = seq[fromIdx];
@@ -559,7 +573,8 @@ function ChapterPlayer() {
       await sleep(200);
       if (cancelled) return;
 
-      const duration = 900;
+      const baseDuration = 900;
+      const duration = Math.max(120, baseDuration * timeScale); // 速すぎて破綻しない保険
       const start = performance.now();
 
       const fromMap = new Map(from.players.map((p) => [p.id, p]));
@@ -638,6 +653,7 @@ function ChapterPlayer() {
     stopPlayChapters,
     applySnapshotInstant,
     setPlayersAndBall,
+    playbackSpeed,
   ]);
 
   return null;
@@ -646,9 +662,13 @@ function ChapterPlayer() {
 export default function App() {
   const [viewMode, setViewMode] = useState<ViewMode>("2d");
   const { mode3D, setMode3D } = useBoardStore();
+
   const [animOpen, setAnimOpen] = useState(false);
 
-  // ===== 録画（画面のcanvasを録る） =====
+  // ✅ 追加：再生速度（0.5 / 1 / 2）
+  const [playbackSpeed, setPlaybackSpeed] = useState<PlaybackSpeed>(1);
+
+  // 録画
   const mainRef = useRef<HTMLDivElement | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
@@ -662,7 +682,6 @@ export default function App() {
       const root = mainRef.current;
       if (!root) return;
 
-      // Board2D/3Dとも canvas がある前提で、メインエリア内の canvas を拾う
       const canvas = root.querySelector("canvas") as HTMLCanvasElement | null;
       if (!canvas || !canvas.captureStream) return;
 
@@ -682,16 +701,11 @@ export default function App() {
           type: mimeType ?? "video/webm",
         });
 
-        const stamp = new Date()
-          .toISOString()
-          .slice(0, 19)
-          .replace(/[:T]/g, "-");
+        const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
         const filename = `rinkboard-animation-${stamp}.${recordExt}`;
 
-        // mp4が非対応環境だとwebmになる（recordExtもwebmになる）
         downloadBlob(blob, filename);
 
-        // stream停止
         stream.getTracks().forEach((t) => t.stop());
       };
 
@@ -699,7 +713,6 @@ export default function App() {
       rec.start();
       setRecording(true);
     } catch {
-      // 失敗しても落とさない
       setRecording(false);
       recorderRef.current = null;
       chunksRef.current = [];
@@ -726,7 +739,7 @@ export default function App() {
         onOpenAnimation={() => setAnimOpen(true)}
       />
 
-      <ChapterPlayer />
+      <ChapterPlayer playbackSpeed={playbackSpeed} />
 
       <div className="flex flex-1 min-h-0">
         <Sidebar onOpenAnimation={() => setAnimOpen(true)} />
@@ -742,6 +755,8 @@ export default function App() {
         onStopRecord={stopRecord}
         recording={recording}
         recordExt={recordExt}
+        playbackSpeed={playbackSpeed}
+        setPlaybackSpeed={setPlaybackSpeed}
       />
     </div>
   );
