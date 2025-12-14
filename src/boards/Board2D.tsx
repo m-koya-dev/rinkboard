@@ -32,9 +32,8 @@ function useLayout() {
   const stageW = size.w;
   const stageH = size.h - toolbarH;
 
-  // ★ここが今回の重要ポイント★
-  // PCもスマホも「ボードの 30x15 を画面いっぱいに収める」ようにスケール計算
-  const pad = isMobile ? 0 : 40; // モバイルは余白ゼロ、PCは少し余白あり
+  // PCは少し余白あり / モバイルは余白ゼロ
+  const pad = isMobile ? 0 : 40;
   const scale = Math.min(
     (stageW - pad * 2) / worldW,
     (stageH - pad * 2) / worldH
@@ -257,7 +256,8 @@ export default function Board2D() {
     const stage = e.target.getStage();
     const local = getLocalFromStage(stage);
     if (!local) return;
-    if (local.x < 0 || local.y < 0 || local.x > rinkW || local.y > rinkH) return;
+    if (local.x < 0 || local.y < 0 || local.x > rinkW || local.y > rinkH)
+      return;
 
     const w = toWorld(local.x, local.y);
     setCurrentLineWorld([w.x, w.y]);
@@ -273,7 +273,8 @@ export default function Board2D() {
     const stage = e.target.getStage();
     const local = getLocalFromStage(stage);
     if (!local) return;
-    if (local.x < 0 || local.y < 0 || local.x > rinkW || local.y > rinkH) return;
+    if (local.x < 0 || local.y < 0 || local.x > rinkW || local.y > rinkH)
+      return;
 
     const w = toWorld(local.x, local.y);
     setCurrentLineWorld((prev) => [...prev, w.x, w.y]);
@@ -316,8 +317,7 @@ export default function Board2D() {
   const penaltyBackXRight = BOUNDS.xMax - 2.5;
   const penaltyFrontXRight = 7;
   const penaltyHeightPx = 6 * scale;
-  const penaltyWidthPx =
-    (penaltyFrontXLeft - penaltyBackXLeft) * scale;
+  const penaltyWidthPx = (penaltyFrontXLeft - penaltyBackXLeft) * scale;
 
   const penaltyCenterLeftPx = toLocal(
     (penaltyBackXLeft + penaltyFrontXLeft) / 2,
@@ -347,6 +347,10 @@ export default function Board2D() {
   const lineW = 0.08 * scale;
   const cornerR = 1.5 * scale;
 
+  // ===== PC用：外枠（緑） =====
+  const outerFrameColor = "#22c55e";
+  const outerMargin = 12; // 外枠の太さ（好みで 10〜18 くらいで調整OK）
+
   const panX = isMobile ? 0 : pan.x;
   const panY = isMobile ? 0 : pan.y;
 
@@ -371,6 +375,18 @@ export default function Board2D() {
             offsetY={rinkH / 2}
             rotation={boardRotation * 90}
           >
+            {/* PCのみ：外側の緑枠 */}
+            {!isMobile && (
+              <Rect
+                x={-outerMargin}
+                y={-outerMargin}
+                width={rinkW + outerMargin * 2}
+                height={rinkH + outerMargin * 2}
+                fill={outerFrameColor}
+                cornerRadius={cornerR + outerMargin}
+              />
+            )}
+
             {/* コート本体 */}
             <Rect
               x={0}
@@ -422,22 +438,11 @@ export default function Board2D() {
 
             {/* ペナルティ前のドット */}
             {frontDots.map((d, i) => (
-              <Circle
-                key={i}
-                x={d.x}
-                y={d.y}
-                radius={dotR}
-                fill={lineColor}
-              />
+              <Circle key={i} x={d.x} y={d.y} radius={dotR} fill={lineColor} />
             ))}
 
             {/* PKスポット */}
-            <Circle
-              x={pkLeftPx.x}
-              y={pkLeftPx.y}
-              radius={pkR}
-              fill={lineColor}
-            />
+            <Circle x={pkLeftPx.x} y={pkLeftPx.y} radius={pkR} fill={lineColor} />
             <Circle
               x={pkRightPx.x}
               y={pkRightPx.y}
@@ -486,10 +491,7 @@ export default function Board2D() {
               <Line
                 points={currentLineWorld.flatMap((v, idx) =>
                   idx % 2 === 0
-                    ? toLocal(
-                        currentLineWorld[idx],
-                        currentLineWorld[idx + 1]
-                      ).x
+                    ? toLocal(currentLineWorld[idx], currentLineWorld[idx + 1]).x
                     : toLocal(currentLineWorld[idx - 1], v).y
                 )}
                 stroke={penColor}
@@ -539,4 +541,3 @@ export default function Board2D() {
     </Stage>
   );
 }
-
