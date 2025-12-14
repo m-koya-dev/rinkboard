@@ -62,8 +62,8 @@ interface DrawState {
   redo: () => void;
   clearAllLines: () => void;
 
-  // ★チャプター用：外部から線を丸ごと差し替える
-  setLinesSnapshot: (lines: DrawLine[]) => void;
+  // ★外部から「線だけ」丸ごと置き換える（chapter再生/読込用）
+  setLinesInstant: (lines: DrawLine[]) => void;
 }
 
 export const useDrawStore = create<DrawState>((set, get) => ({
@@ -78,7 +78,7 @@ export const useDrawStore = create<DrawState>((set, get) => ({
   historyIndex: 0,
 
   setTool: (tool) =>
-    set(() => ({
+    set((_state) => ({
       activeTool: tool,
       penEnabled: tool === "pen",
       eraserEnabled: tool === "eraser",
@@ -136,24 +136,22 @@ export const useDrawStore = create<DrawState>((set, get) => ({
       historyIndex: 0,
     }),
 
-  // ★チャプター用：線を差し替え（Undo/Redo履歴もリセット）
-  setLinesSnapshot: (lines) =>
+  setLinesInstant: (lines) =>
     set({
-      lines: lines ?? [],
-      history: [lines ?? []],
+      lines,
+      history: [lines],
       historyIndex: 0,
     }),
 }));
 
-/* ====== 盤面（選手・ボール・回転など） ====== */
+/* ====== 盤面（選手・ボール・回転・チャプターなど） ====== */
 
 export interface ChapterSnapshot {
-  id: string; // "1"〜"10"
-  title: string;
+  id: string; // "1".."10"
   players: Player[];
   ball: Ball;
   boardRotation: 0 | 1 | 2 | 3;
-  lines: DrawLine[];
+  lines: DrawLine[]; // ★チャプターごとに線も保存
 }
 
 interface BoardState {
@@ -163,12 +161,12 @@ interface BoardState {
   selectedId: string | null;
   mode3D: Mode3D;
 
-  // ===== チャプター =====
-  chapters: ChapterSnapshot[]; // 最大10
+  // chapters
+  chapters: ChapterSnapshot[];
   activeChapterIndex: number; // 0..9
   isPlayingChapters: boolean;
 
-  // actions
+  // actions (basic)
   selectPlayer: (id: string | null) => void;
   updatePlayer: (id: string, patch: Partial<Player>) => void;
   updateBall: (patch: Partial<Ball>) => void;
@@ -176,48 +174,124 @@ interface BoardState {
   resetPositions: () => void;
   setMode3D: (mode: Mode3D) => void;
 
-  // ★チャプター操作
-  setActiveChapterIndex: (idx: number) => void;
+  // actions (chapters)
   saveChapterAtActive: () => void;
-  loadChapter: (idx: number) => void;
   clearChapters: () => void;
-
-  // ★ここが今回追加：チャプター切替（自動セーブ付き）
-  switchChapter: (nextIdx: number) => void;
-
-  // ★再生
+  switchChapter: (index: number) => void;
   startPlayChapters: () => void;
   stopPlayChapters: () => void;
 
-  // ★アニメ用：盤面をまとめて適用
+  // chapter playback helpers
   applySnapshotInstant: (snap: {
     players: Player[];
     ball: Ball;
     boardRotation: 0 | 1 | 2 | 3;
     lines: DrawLine[];
   }) => void;
-
-  // ★アニメ用：プレイヤー/ボールだけ更新（毎フレーム）
   setPlayersAndBall: (players: Player[], ball: Ball) => void;
+
+  // export/import
+  exportAllToObject: () => ExportDataV1;
+  importAllFromObject: (data: unknown) => { ok: boolean; message: string };
 }
 
 function createInitialPlayers(): Player[] {
   // 左チーム（A）：GK + FP4
   const teamA: Player[] = [
-    { id: "A-GK", team: "A", role: "GK", x: BOUNDS.xMin + 2, y: 0, color: "#0ea5e9", number: 1 },
-    { id: "A-FP1", team: "A", role: "FP", x: -8, y: 3, color: "#0ea5e9", number: 4 },
-    { id: "A-FP2", team: "A", role: "FP", x: -8, y: -3, color: "#0ea5e9", number: 5 },
-    { id: "A-FP3", team: "A", role: "FP", x: -4, y: 2, color: "#0ea5e9", number: 7 },
-    { id: "A-FP4", team: "A", role: "FP", x: -4, y: -2, color: "#0ea5e9", number: 9 },
+    {
+      id: "A-GK",
+      team: "A",
+      role: "GK",
+      x: BOUNDS.xMin + 2,
+      y: 0,
+      color: "#0ea5e9",
+      number: 1,
+    },
+    {
+      id: "A-FP1",
+      team: "A",
+      role: "FP",
+      x: -8,
+      y: 3,
+      color: "#0ea5e9",
+      number: 4,
+    },
+    {
+      id: "A-FP2",
+      team: "A",
+      role: "FP",
+      x: -8,
+      y: -3,
+      color: "#0ea5e9",
+      number: 5,
+    },
+    {
+      id: "A-FP3",
+      team: "A",
+      role: "FP",
+      x: -4,
+      y: 2,
+      color: "#0ea5e9",
+      number: 7,
+    },
+    {
+      id: "A-FP4",
+      team: "A",
+      role: "FP",
+      x: -4,
+      y: -2,
+      color: "#0ea5e9",
+      number: 9,
+    },
   ];
 
   // 右チーム（B）：GK + FP4
   const teamB: Player[] = [
-    { id: "B-GK", team: "B", role: "GK", x: BOUNDS.xMax - 2, y: 0, color: "#f97316", number: 1 },
-    { id: "B-FP1", team: "B", role: "FP", x: 8, y: 3, color: "#f97316", number: 4 },
-    { id: "B-FP2", team: "B", role: "FP", x: 8, y: -3, color: "#f97316", number: 5 },
-    { id: "B-FP3", team: "B", role: "FP", x: 4, y: 2, color: "#f97316", number: 7 },
-    { id: "B-FP4", team: "B", role: "FP", x: 4, y: -2, color: "#f97316", number: 9 },
+    {
+      id: "B-GK",
+      team: "B",
+      role: "GK",
+      x: BOUNDS.xMax - 2,
+      y: 0,
+      color: "#f97316",
+      number: 1,
+    },
+    {
+      id: "B-FP1",
+      team: "B",
+      role: "FP",
+      x: 8,
+      y: 3,
+      color: "#f97316",
+      number: 4,
+    },
+    {
+      id: "B-FP2",
+      team: "B",
+      role: "FP",
+      x: 8,
+      y: -3,
+      color: "#f97316",
+      number: 5,
+    },
+    {
+      id: "B-FP3",
+      team: "B",
+      role: "FP",
+      x: 4,
+      y: 2,
+      color: "#f97316",
+      number: 7,
+    },
+    {
+      id: "B-FP4",
+      team: "B",
+      role: "FP",
+      x: 4,
+      y: -2,
+      color: "#f97316",
+      number: 9,
+    },
   ];
 
   return [...teamA, ...teamB];
@@ -225,28 +299,88 @@ function createInitialPlayers(): Player[] {
 
 const initialBall: Ball = { x: 0, y: 0 };
 
-function clampIdx(idx: number) {
-  return Math.max(0, Math.min(9, idx));
-}
+/* =========================
+   Export / Import フォーマット
+========================= */
+type ExportDataV1 = {
+  version: 1;
+  savedAt: string;
+  board: {
+    players: Player[];
+    ball: Ball;
+    boardRotation: 0 | 1 | 2 | 3;
+    selectedId: string | null;
+    mode3D: Mode3D;
+    chapters: ChapterSnapshot[];
+    activeChapterIndex: number;
+  };
+  draw: {
+    lines: DrawLine[];
+  };
+};
 
-function clonePlayers(players: Player[]) {
-  return players.map((p) => ({ ...p }));
-}
-function cloneLines(lines: DrawLine[]) {
-  return lines.map((l) => ({ ...l, points: [...l.points] }));
-}
+const LS_KEY = "rinkboard_export_v1";
 
-// chapters を 10枠として扱うユーティリティ
-function toFixedSlots(chapters: ChapterSnapshot[]) {
-  const fixed: (ChapterSnapshot | null)[] = Array(10).fill(null);
-  for (const c of chapters) {
-    const n = Number(c.id) - 1;
-    if (!Number.isNaN(n) && n >= 0 && n < 10) fixed[n] = c;
-  }
-  return fixed;
+function isObj(v: unknown): v is Record<string, any> {
+  return !!v && typeof v === "object";
 }
-function fromFixedSlots(fixed: (ChapterSnapshot | null)[]) {
-  return fixed.filter(Boolean) as ChapterSnapshot[];
+function isNum(v: unknown): v is number {
+  return typeof v === "number" && Number.isFinite(v);
+}
+function isStr(v: unknown): v is string {
+  return typeof v === "string";
+}
+function clampRot(v: any): 0 | 1 | 2 | 3 {
+  const n = Number(v);
+  if (n === 1 || n === 2 || n === 3) return n;
+  return 0;
+}
+function sanitizePlayer(p: any): Player | null {
+  if (!isObj(p)) return null;
+  if (!isStr(p.id)) return null;
+  const team = p.team === "A" || p.team === "B" ? (p.team as TeamId) : null;
+  const role = p.role === "GK" || p.role === "FP" ? (p.role as Role) : null;
+  if (!team || !role) return null;
+  if (!isNum(p.x) || !isNum(p.y)) return null;
+  if (!isStr(p.color)) return null;
+  if (!isNum(p.number)) return null;
+  return {
+    id: p.id,
+    team,
+    role,
+    x: p.x,
+    y: p.y,
+    color: p.color,
+    number: p.number,
+  };
+}
+function sanitizeBall(b: any): Ball {
+  if (!isObj(b)) return { ...initialBall };
+  const x = isNum(b.x) ? b.x : 0;
+  const y = isNum(b.y) ? b.y : 0;
+  return { x, y };
+}
+function sanitizeLine(l: any): DrawLine | null {
+  if (!isObj(l)) return null;
+  if (!Array.isArray(l.points)) return null;
+  const pts = l.points.map(Number).filter((n: any) => Number.isFinite(n));
+  if (pts.length < 4) return null;
+  const color = isStr(l.color) ? l.color : "#111827";
+  const width = isNum(l.width) ? l.width : 3;
+  return { points: pts, color, width };
+}
+function sanitizeChapter(c: any): ChapterSnapshot | null {
+  if (!isObj(c)) return null;
+  const id = isStr(c.id) ? c.id : null;
+  if (!id) return null;
+  if (!Array.isArray(c.players)) return null;
+  const players = c.players.map(sanitizePlayer).filter(Boolean) as Player[];
+  const ball = sanitizeBall(c.ball);
+  const boardRotation = clampRot(c.boardRotation);
+  const lines = Array.isArray(c.lines)
+    ? (c.lines.map(sanitizeLine).filter(Boolean) as DrawLine[])
+    : [];
+  return { id, players, ball, boardRotation, lines };
 }
 
 export const useBoardStore = create<BoardState>((set, get) => ({
@@ -263,18 +397,18 @@ export const useBoardStore = create<BoardState>((set, get) => ({
   selectPlayer: (id) => set({ selectedId: id }),
 
   updatePlayer: (id, patch) =>
-    set((state) => ({
-      players: state.players.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+    set((_state) => ({
+      players: _state.players.map((p) => (p.id === id ? { ...p, ...patch } : p)),
     })),
 
   updateBall: (patch) =>
-    set((state) => ({
-      ball: { ...state.ball, ...patch },
+    set((_state) => ({
+      ball: { ..._state.ball, ...patch },
     })),
 
   rotateBoard: () =>
-    set((state) => ({
-      boardRotation: (((state.boardRotation + 1) % 4) as 0 | 1 | 2 | 3),
+    set((_state) => ({
+      boardRotation: (((_state.boardRotation + 1) % 4) as 0 | 1 | 2 | 3),
     })),
 
   resetPositions: () =>
@@ -284,78 +418,59 @@ export const useBoardStore = create<BoardState>((set, get) => ({
       boardRotation: 0,
       selectedId: null,
       mode3D: "camera",
+      // ★チャプターや線は残す（今までの動作を壊さない）
     }),
 
   setMode3D: (mode) => set({ mode3D: mode }),
 
-  setActiveChapterIndex: (idx) => set({ activeChapterIndex: clampIdx(idx) }),
+  /* ===== Chapters ===== */
 
   saveChapterAtActive: () => {
-    const idx = clampIdx(get().activeChapterIndex);
-    const state = get();
-    const draw = useDrawStore.getState();
+    const idx = get().activeChapterIndex;
+    const id = String(idx + 1);
 
     const snap: ChapterSnapshot = {
-      id: String(idx + 1),
-      title: `Chapter ${idx + 1}`,
-      players: clonePlayers(state.players),
-      ball: { ...state.ball },
-      boardRotation: state.boardRotation,
-      lines: cloneLines(draw.lines),
+      id,
+      players: get().players.map((p) => ({ ...p })),
+      ball: { ...get().ball },
+      boardRotation: get().boardRotation,
+      lines: useDrawStore.getState().lines.map((l) => ({
+        points: [...l.points],
+        color: l.color,
+        width: l.width,
+      })),
     };
 
     set((s) => {
-      const fixed = toFixedSlots(s.chapters);
-      fixed[idx] = snap;
-      return { chapters: fromFixedSlots(fixed) };
+      const others = s.chapters.filter((c) => c.id !== id);
+      return { chapters: [...others, snap] };
     });
-  },
-
-  loadChapter: (idx) => {
-    const targetIdx = clampIdx(idx);
-    const s = get();
-    const fixed = toFixedSlots(s.chapters);
-    const snap = fixed[targetIdx];
-    if (!snap) return;
-
-    set({
-      players: clonePlayers(snap.players),
-      ball: { ...snap.ball },
-      boardRotation: snap.boardRotation,
-      selectedId: null,
-    });
-    useDrawStore.getState().setLinesSnapshot(cloneLines(snap.lines));
   },
 
   clearChapters: () => {
     set({ chapters: [], activeChapterIndex: 0, isPlayingChapters: false });
   },
 
-  // ★今回の本命：チャプター切替（自動セーブ → 切替 → 保存済みならロード）
-  switchChapter: (nextIdxRaw) => {
-    const nextIdx = clampIdx(nextIdxRaw);
-    const s = get();
-    if (s.isPlayingChapters) return; // 再生中は切替させない（事故防止）
+  switchChapter: (index) => {
+    const idx = Math.max(0, Math.min(9, index));
 
-    // 1) 今のアクティブを自動保存（常に）
-    s.saveChapterAtActive();
+    // ★「切り替えたら自動保存」：今の章を保存してから移動
+    get().saveChapterAtActive();
 
-    // 2) アクティブ番号を更新
-    set({ activeChapterIndex: nextIdx, selectedId: null });
+    set({ activeChapterIndex: idx });
 
-    // 3) 次が保存済みならロード（未保存なら「現状の盤面」をそのまま使って編集開始）
-    const fixed = toFixedSlots(get().chapters);
-    const target = fixed[nextIdx];
-    if (target) {
+    const id = String(idx + 1);
+    const found = get().chapters.find((c) => c.id === id);
+
+    if (found) {
       get().applySnapshotInstant({
-        players: target.players,
-        ball: target.ball,
-        boardRotation: target.boardRotation,
-        lines: target.lines,
+        players: found.players,
+        ball: found.ball,
+        boardRotation: found.boardRotation,
+        lines: found.lines,
       });
     } else {
-      // 未保存スロット：線はそのままでもいいが、混乱しやすいので一旦空にするならここで
-      // 今回は「続きとして編集したい」ケースが多いので、何もしない（＝現状維持）
+      // 空チャプターなら何もしない（現状維持）
     }
   },
 
@@ -364,15 +479,153 @@ export const useBoardStore = create<BoardState>((set, get) => ({
 
   applySnapshotInstant: (snap) => {
     set({
-      players: clonePlayers(snap.players),
+      players: snap.players.map((p) => ({ ...p })),
       ball: { ...snap.ball },
       boardRotation: snap.boardRotation,
       selectedId: null,
     });
-    useDrawStore.getState().setLinesSnapshot(cloneLines(snap.lines));
+    useDrawStore.getState().setLinesInstant(
+      (snap.lines ?? []).map((l) => ({
+        points: [...l.points],
+        color: l.color,
+        width: l.width,
+      }))
+    );
   },
 
   setPlayersAndBall: (players, ball) => {
-    set({ players: clonePlayers(players), ball: { ...ball } });
+    set({
+      players: players.map((p) => ({ ...p })),
+      ball: { ...ball },
+    });
+  },
+
+  /* ===== Export / Import ===== */
+
+  exportAllToObject: () => {
+    const b = get();
+    const d = useDrawStore.getState();
+    const data: ExportDataV1 = {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      board: {
+        players: b.players.map((p) => ({ ...p })),
+        ball: { ...b.ball },
+        boardRotation: b.boardRotation,
+        selectedId: b.selectedId,
+        mode3D: b.mode3D,
+        chapters: b.chapters.map((c) => ({
+          id: c.id,
+          players: c.players.map((p) => ({ ...p })),
+          ball: { ...c.ball },
+          boardRotation: c.boardRotation,
+          lines: (c.lines ?? []).map((l) => ({
+            points: [...l.points],
+            color: l.color,
+            width: l.width,
+          })),
+        })),
+        activeChapterIndex: b.activeChapterIndex,
+      },
+      draw: {
+        lines: d.lines.map((l) => ({
+          points: [...l.points],
+          color: l.color,
+          width: l.width,
+        })),
+      },
+    };
+    return data;
+  },
+
+  importAllFromObject: (raw) => {
+    try {
+      if (!isObj(raw)) return { ok: false, message: "JSONの形式が不正です。" };
+      if (raw.version !== 1) {
+        return { ok: false, message: "未対応のバージョンです。" };
+      }
+      if (!isObj(raw.board) || !isObj(raw.draw)) {
+        return { ok: false, message: "JSONの中身が不足しています。" };
+      }
+
+      const board = raw.board;
+      const draw = raw.draw;
+
+      const players = Array.isArray(board.players)
+        ? (board.players.map(sanitizePlayer).filter(Boolean) as Player[])
+        : createInitialPlayers();
+
+      const ball = sanitizeBall(board.ball);
+      const boardRotation = clampRot(board.boardRotation);
+
+      const mode3D: Mode3D =
+        board.mode3D === "piece" ? "piece" : "camera";
+
+      const activeChapterIndex = (() => {
+        const n = Number(board.activeChapterIndex);
+        if (!Number.isFinite(n)) return 0;
+        return Math.max(0, Math.min(9, Math.floor(n)));
+      })();
+
+      const chapters = Array.isArray(board.chapters)
+        ? (board.chapters.map(sanitizeChapter).filter(Boolean) as ChapterSnapshot[])
+        : [];
+
+      const lines = Array.isArray(draw.lines)
+        ? (draw.lines.map(sanitizeLine).filter(Boolean) as DrawLine[])
+        : [];
+
+      // 反映（今あるUI/機能を壊さないため、必要最小限に上書き）
+      set({
+        players,
+        ball,
+        boardRotation,
+        selectedId: null,
+        mode3D,
+        chapters,
+        activeChapterIndex,
+        isPlayingChapters: false,
+      });
+      useDrawStore.getState().setLinesInstant(lines);
+
+      return { ok: true, message: "読み込みに成功しました。" };
+    } catch (e: any) {
+      return { ok: false, message: "読み込み中にエラーが発生しました。" };
+    }
   },
 }));
+
+/* =========================
+   自動保存（localStorage）
+   - 既存UIを崩さず、裏側だけで保存する
+========================= */
+
+let saveTimer: any = null;
+
+function scheduleAutoSave() {
+  if (saveTimer) return;
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    try {
+      const data = useBoardStore.getState().exportAllToObject();
+      localStorage.setItem(LS_KEY, JSON.stringify(data));
+    } catch {
+      // 失敗してもアプリ動作は止めない
+    }
+  }, 250); // 軽いスロットリング
+}
+
+try {
+  // 状態変化で自動保存
+  useBoardStore.subscribe(() => scheduleAutoSave());
+  useDrawStore.subscribe(() => scheduleAutoSave());
+
+  // 起動時：復元
+  const raw = localStorage.getItem(LS_KEY);
+  if (raw) {
+    const parsed = JSON.parse(raw);
+    useBoardStore.getState().importAllFromObject(parsed);
+  }
+} catch {
+  // localStorageが使えない環境でも落とさない
+}
