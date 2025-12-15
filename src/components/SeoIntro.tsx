@@ -1,35 +1,64 @@
+// src/components/SeoIntro.tsx
+import { useState } from "react";
+
 export default function SeoIntro() {
+  const [open, setOpen] = useState(false);
+
   return (
-    <section className="px-6 py-8 max-w-4xl mx-auto text-slate-100">
-      <h1 className="text-2xl font-bold mb-4">
-        リンクホッケー・ローラーホッケー戦術ボード「RinkBoard」
-      </h1>
+    <section className="w-full">
+      <div className="mx-auto w-full max-w-5xl px-4 pb-2">
+        {/* ほぼ存在しないトグル */}
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-controls="seo-intro"
+          className="
+            block
+            w-[6px] h-[6px]
+            bg-slate-900
+            opacity-0
+            pointer-events-auto
+            select-none
+          "
+          title="about"
+        >
+          {/* 中身なし */}
+        </button>
 
-      <p className="text-slate-300 leading-relaxed mb-4">
-        RinkBoard は、リンクホッケー・ローラーホッケー専用に設計された
-        無料の戦術ボードアプリです。2D / 3D 表示に対応し、駒を自由に動かしながら
-        作戦やフォーメーションを直感的に作成できます。
-      </p>
+        {/* SEO 本文 */}
+        <div
+          id="seo-intro"
+          className={[
+            "mt-1 text-[11px] leading-relaxed text-slate-400",
+            open ? "block" : "hidden",
+          ].join(" ")}
+        >
+          <p>
+            RinkBoard は、リンクホッケーやローラーホッケー向けに作られた
+            シンプルな戦術ボードです。2D と 3D を切り替えながら、
+            フォーメーションの確認や作戦の共有ができます。
+          </p>
 
-      <h2 className="text-xl font-semibold mt-6 mb-2">
-        主な機能
-      </h2>
-      <ul className="list-disc pl-6 text-slate-300 space-y-1">
-        <li>2D / 3D 戦術ボード切り替え</li>
-        <li>駒・ボールの自由配置</li>
-        <li>ペン・消しゴムによる作図</li>
-        <li>チャプター保存とアニメーション再生</li>
-        <li>MP4動画として保存</li>
-        <li>PC・スマートフォン対応</li>
-      </ul>
+          <p className="mt-2">
+            駒やボールを自由に動かし、線を書いて動きを整理したり、
+            場面ごとにチャプターとして保存し、
+            アニメーションとして順番に再生することも可能です。
+          </p>
 
-      <h2 className="text-xl font-semibold mt-6 mb-2">
-        こんな人におすすめ
-      </h2>
-      <p className="text-slate-300">
-        チーム戦術を共有したい指導者、作戦を可視化したい選手、
-        リンクホッケーやローラーホッケーの練習効率を上げたい方に最適です。
-      </p>
+          <p className="mt-2">
+            個人練習からチームミーティングまで、
+            実際のリンクを想定した配置で戦術を考えるための
+            ツールとして設計されています。
+          </p>
+
+          <p className="mt-2">
+            キーワード：
+            リンクホッケー、ローラーホッケー、戦術ボード、
+            ホッケー戦術、roller hockey tactics、rink hockey board
+          </p>
+        </div>
+      </div>
     </section>
   );
 }
