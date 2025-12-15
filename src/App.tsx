@@ -4,6 +4,7 @@ import Board2D from "./boards/Board2D";
 import Board3D from "./boards/Board3D";
 import { useBoardStore, useDrawStore } from "./store";
 import type { Mode3D } from "./store";
+import SeoIntro from "./components/SeoIntro";
 
 type ViewMode = "2d" | "3d";
 type PlaybackSpeed = 0.5 | 1 | 2;
@@ -745,6 +746,7 @@ export default function App() {
         <Sidebar onOpenAnimation={() => setAnimOpen(true)} />
         <main ref={mainRef} className="flex-1 min-h-0 min-w-0 bg-slate-900 relative">
           {viewMode === "2d" ? <Board2D /> : <Board3D />}
+          <SeoIntro/>
         </main>
       </div>
 
