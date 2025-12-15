@@ -90,7 +90,7 @@ function Header({
     mode3DBase + " bg-white/5 text-slate-100 border-white/10 hover:bg-white/10";
 
   return (
-    <header className="flex items-center justify-between px-4 py-2 bg-slate-900/95 border-b border-slate-800">
+    <header className="flex items-center justify-between px-4 py-1  bg-slate-900/95 border-b border-slate-800">
       {/* 左：ロゴ */}
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center font-bold text-slate-900">
