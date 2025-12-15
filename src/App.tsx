@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Board2D from "./boards/Board2D";
 import Board3D from "./boards/Board3D";
 import { useBoardStore, useDrawStore } from "./store";
-import type { Mode3D } from "./store";
+import type { Mode3D, TeamId, Role } from "./store";
 import SeoIntro from "./components/SeoIntro";
 
 type ViewMode = "2d" | "3d";
@@ -66,12 +66,14 @@ function Header({
   mode3D,
   setMode3D,
   onOpenAnimation,
+  onOpenPlayers,
 }: {
   viewMode: ViewMode;
   setViewMode: (v: ViewMode) => void;
   mode3D: Mode3D;
   setMode3D: (m: Mode3D) => void;
   onOpenAnimation: () => void;
+  onOpenPlayers: () => void;
 }) {
   const { rotateBoard, resetPositions } = useBoardStore();
   const { undo, redo, clearAllLines } = useDrawStore();
@@ -90,7 +92,7 @@ function Header({
     mode3DBase + " bg-white/5 text-slate-100 border-white/10 hover:bg-white/10";
 
   return (
-    <header className="flex items-center justify-between px-4 py-1  bg-slate-900/95 border-b border-slate-800">
+    <header className="flex items-center justify-between px-4 py- 1  bg-slate-900/95 border-b border-slate-800">
       {/* 左：ロゴ */}
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center font-bold text-slate-900">
@@ -140,6 +142,7 @@ function Header({
 
       {/* 右：アクション系 */}
       <div className="flex items-center gap-2">
+        {/* ★位置を変えない（あなたの指定） */}
         <button className={buttonBase} onClick={onOpenAnimation}>
           🎞 Animation
         </button>
@@ -161,6 +164,11 @@ function Header({
           }}
         >
           Reset
+        </button>
+
+        {/* ✅追加：Players（既存の並びは壊さず末尾に追加） */}
+        <button className={buttonBase} onClick={onOpenPlayers} title="Add / Remove / Number">
+          👥 Players
         </button>
       </div>
     </header>
@@ -220,7 +228,7 @@ function Sidebar({ onOpenAnimation }: { onOpenAnimation: () => void }) {
         <ToolButton id="pen" label="Pen" icon="✏️" />
         <ToolButton id="eraser" label="Eraser" icon="🧽" />
 
-        {/* ✅ Animeボタンは無効（Arrow/Text）より上 */}
+        {/* ✅ Animeボタンは無効（Arrow/Text）より上（あなたの指定維持） */}
         <button
           className={
             "mt-2 w-full flex flex-col items-center gap-1 px-2 py-3 text-[11px] cursor-pointer border-l-2 border-transparent text-slate-300 hover:bg:white/5 hover:border-slate-600 transition"
@@ -437,13 +445,11 @@ function AnimationPanel({
                 </div>
               </div>
 
-              {/* ✅ 追加：再生速度 */}
+              {/* ✅ 再生速度 */}
               <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-slate-300">Speed</span>
-                  <span className="text-[11px] text-slate-500">
-                    {playbackSpeed}x
-                  </span>
+                  <span className="text-[11px] text-slate-500">{playbackSpeed}x</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <button className={speedBtn(0.5)} onClick={() => setPlaybackSpeed(0.5)}>
@@ -524,6 +530,235 @@ function AnimationPanel({
   );
 }
 
+/* =========================
+   ✅ Players Panel（追加）
+========================= */
+
+function PlayersPanel({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  const isMobile = useIsMobile();
+  const { players, selectedId, selectPlayer, addPlayer, removePlayer, setPlayerNumber } =
+    useBoardStore();
+
+  const selected = players.find((p) => p.id === selectedId) ?? null;
+
+  const baseBtn =
+    "px-2 py-1 rounded-md text-xs border border-white/15 hover:bg-white/10 transition";
+  const primary =
+    "px-3 py-1 rounded-md text-xs font-medium bg-emerald-500 text-slate-900 hover:bg-emerald-400 transition";
+  const danger =
+    "px-3 py-1 rounded-md text-xs font-medium bg-rose-500 text-white hover:bg-rose-400 transition";
+
+  const maxH = isMobile ? "max-h-[45vh]" : "max-h-[38vh]";
+
+  // Addフロー：Add押下→チーム選択
+  const [addPicking, setAddPicking] = useState(false);
+  const [addRole, setAddRole] = useState<Role>("FP");
+
+  const teamBtn = (team: TeamId) =>
+    [
+      "px-3 py-1 rounded-md text-xs font-medium border transition",
+      team === "A"
+        ? "bg-sky-500/20 text-sky-200 border-sky-400/40 hover:bg-sky-500/30"
+        : "bg-orange-500/20 text-orange-200 border-orange-400/40 hover:bg-orange-500/30",
+    ].join(" ");
+
+  return (
+    <>
+      {open && <div className="fixed inset-0 bg-black/25 z-40" onClick={onClose} />}
+
+      <div
+        className={[
+          "fixed left-0 right-0 bottom-0 z-50",
+          "transition-transform duration-200 ease-out",
+          open ? "translate-y-0" : "translate-y-full",
+        ].join(" ")}
+      >
+        <div className="mx-auto w-full md:max-w-3xl">
+          <div className="bg-slate-900/98 border-t border-slate-700 shadow-2xl rounded-t-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-1.5 rounded-full bg-slate-600/70" />
+                <span className="text-sm text-slate-100 font-semibold">Players</span>
+                <span className="text-[11px] text-slate-400">（追加 / 削除 / 背番号）</span>
+              </div>
+              <button
+                className="text-slate-300 hover:text-white text-sm"
+                onClick={onClose}
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className={["px-4 py-3 overflow-auto", maxH].join(" ")}>
+              {/* 上段：選択中 */}
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="text-[12px] text-slate-200">
+                  Selected:{" "}
+                  {selected ? (
+                    <span className="font-semibold">
+                      {selected.id}（Team {selected.team} / {selected.role}）
+                    </span>
+                  ) : (
+                    <span className="text-slate-400">none</span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {!addPicking ? (
+                    <button
+                      className={primary}
+                      onClick={() => setAddPicking(true)}
+                      title="Add player"
+                    >
+                      + Add
+                    </button>
+                  ) : (
+                    <button
+                      className={baseBtn}
+                      onClick={() => setAddPicking(false)}
+                      title="Cancel"
+                    >
+                      Cancel
+                    </button>
+                  )}
+
+                  <button
+                    className={danger}
+                    disabled={!selected}
+                    onClick={() => {
+                      if (!selected) return;
+                      removePlayer(selected.id);
+                    }}
+                    title="Remove selected"
+                    style={!selected ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+
+              {/* Add → team選択（仕様どおり） */}
+              {addPicking && (
+                <div className="mt-3 p-3 rounded-lg border border-white/10 bg-white/5">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="text-xs text-slate-300">
+                      Add player: teamを選んでください
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-slate-400">Role</span>
+                      <select
+                        className="text-xs bg-slate-900 border border-white/15 rounded px-2 py-1 text-slate-100"
+                        value={addRole}
+                        onChange={(e) => setAddRole((e.target.value as Role) ?? "FP")}
+                      >
+                        <option value="FP">FP</option>
+                        <option value="GK">GK</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="mt-2 flex items-center gap-2">
+                    <button
+                      className={teamBtn("A")}
+                      onClick={() => {
+                        addPlayer("A", addRole);
+                        setAddPicking(false);
+                      }}
+                    >
+                      Team A
+                    </button>
+                    <button
+                      className={teamBtn("B")}
+                      onClick={() => {
+                        addPlayer("B", addRole);
+                        setAddPicking(false);
+                      }}
+                    >
+                      Team B
+                    </button>
+                  </div>
+
+                  <div className="mt-2 text-[11px] text-slate-400 leading-relaxed">
+                    ・背番号は「チーム内で未使用の最小番号」を自動で付与します<br />
+                    ・追加した駒は自動で選択されます
+                  </div>
+                </div>
+              )}
+
+              {/* 背番号変更 */}
+              <div className="mt-4 flex items-center gap-3 flex-wrap">
+                <div className="text-xs text-slate-300">背番号</div>
+                <input
+                  type="number"
+                  min={0}
+                  max={99}
+                  value={selected ? selected.number : ""}
+                  disabled={!selected}
+                  onChange={(e) => {
+                    if (!selected) return;
+                    setPlayerNumber(selected.id, Number(e.target.value));
+                  }}
+                  className="w-24 text-xs bg-slate-900 border border-white/15 rounded px-2 py-1 text-slate-100 disabled:opacity-50"
+                />
+                <span className="text-[11px] text-slate-500">
+                  （選択中の駒だけ変更できます）
+                </span>
+              </div>
+
+              {/* 一覧（クリックで選択） */}
+              <div className="mt-4">
+                <div className="text-[11px] text-slate-400 mb-2">Players list</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {players.map((p) => {
+                    const active = p.id === selectedId;
+                    return (
+                      <button
+                        key={p.id}
+                        className={[
+                          "text-left px-3 py-2 rounded-lg border transition",
+                          active
+                            ? "border-emerald-400 bg-emerald-500/10"
+                            : "border-white/10 bg-white/5 hover:bg-white/10",
+                        ].join(" ")}
+                        onClick={() => selectPlayer(active ? null : p.id)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="text-xs text-slate-100 font-semibold">
+                            {p.id}
+                          </div>
+                          <div className="text-[11px] text-slate-400">
+                            #{p.number}
+                          </div>
+                        </div>
+                        <div className="mt-0.5 text-[11px] text-slate-400">
+                          Team {p.team} / {p.role} ・ ({p.x.toFixed(1)}, {p.y.toFixed(1)})
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="mt-3 text-[11px] text-slate-500 leading-relaxed">
+                ・削除してもチャプターや線は消えません（既存仕様を維持）<br />
+                ・再生中（Play中）に追加/削除をすると意図とズレる可能性があるので、基本は停止中推奨
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 function ChapterPlayer({ playbackSpeed }: { playbackSpeed: PlaybackSpeed }) {
   const {
     chapters,
@@ -585,8 +820,7 @@ function ChapterPlayer({ playbackSpeed }: { playbackSpeed: PlaybackSpeed }) {
         if (cancelled) return;
 
         const t = Math.min(1, (now - start) / duration);
-        const eased =
-          t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 
         const nextPlayers = to.players.map((tp) => {
           const fp = fromMap.get(tp.id) ?? tp;
@@ -666,8 +900,11 @@ export default function App() {
 
   const [animOpen, setAnimOpen] = useState(false);
 
-  // ✅ 追加：再生速度（0.5 / 1 / 2）
+  // ✅ 再生速度（0.5 / 1 / 2）
   const [playbackSpeed, setPlaybackSpeed] = useState<PlaybackSpeed>(1);
+
+  // ✅ Players Panel
+  const [playersOpen, setPlayersOpen] = useState(false);
 
   // 録画
   const mainRef = useRef<HTMLDivElement | null>(null);
@@ -689,9 +926,7 @@ export default function App() {
       const stream = canvas.captureStream(60);
       chunksRef.current = [];
 
-      const rec = mimeType
-        ? new MediaRecorder(stream, { mimeType })
-        : new MediaRecorder(stream);
+      const rec = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
 
       rec.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
@@ -738,6 +973,7 @@ export default function App() {
         mode3D={mode3D}
         setMode3D={setMode3D}
         onOpenAnimation={() => setAnimOpen(true)}
+        onOpenPlayers={() => setPlayersOpen(true)}
       />
 
       <ChapterPlayer playbackSpeed={playbackSpeed} />
@@ -746,7 +982,7 @@ export default function App() {
         <Sidebar onOpenAnimation={() => setAnimOpen(true)} />
         <main ref={mainRef} className="flex-1 min-h-0 min-w-0 bg-slate-900 relative">
           {viewMode === "2d" ? <Board2D /> : <Board3D />}
-          <SeoIntro/>
+          <SeoIntro />
         </main>
       </div>
 
@@ -760,7 +996,8 @@ export default function App() {
         playbackSpeed={playbackSpeed}
         setPlaybackSpeed={setPlaybackSpeed}
       />
+
+      <PlayersPanel open={playersOpen} onClose={() => setPlayersOpen(false)} />
     </div>
   );
 }
-

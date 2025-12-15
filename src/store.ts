@@ -161,6 +161,11 @@ interface BoardState {
   selectedId: string | null;
   mode3D: Mode3D;
 
+  // ✅ players edit
+  addPlayer: (team: TeamId, role?: Role) => { ok: boolean; id?: string; message?: string };
+  removePlayer: (id: string) => void;
+  setPlayerNumber: (id: string, number: number) => void;
+
   // chapters
   chapters: ChapterSnapshot[];
   activeChapterIndex: number; // 0..9
@@ -207,42 +212,10 @@ function createInitialPlayers(): Player[] {
       color: "#0ea5e9",
       number: 1,
     },
-    {
-      id: "A-FP1",
-      team: "A",
-      role: "FP",
-      x: -8,
-      y: 3,
-      color: "#0ea5e9",
-      number: 4,
-    },
-    {
-      id: "A-FP2",
-      team: "A",
-      role: "FP",
-      x: -8,
-      y: -3,
-      color: "#0ea5e9",
-      number: 5,
-    },
-    {
-      id: "A-FP3",
-      team: "A",
-      role: "FP",
-      x: -4,
-      y: 2,
-      color: "#0ea5e9",
-      number: 7,
-    },
-    {
-      id: "A-FP4",
-      team: "A",
-      role: "FP",
-      x: -4,
-      y: -2,
-      color: "#0ea5e9",
-      number: 9,
-    },
+    { id: "A-FP1", team: "A", role: "FP", x: -8, y: 3, color: "#0ea5e9", number: 4 },
+    { id: "A-FP2", team: "A", role: "FP", x: -8, y: -3, color: "#0ea5e9", number: 5 },
+    { id: "A-FP3", team: "A", role: "FP", x: -4, y: 2, color: "#0ea5e9", number: 7 },
+    { id: "A-FP4", team: "A", role: "FP", x: -4, y: -2, color: "#0ea5e9", number: 9 },
   ];
 
   // 右チーム（B）：GK + FP4
@@ -256,42 +229,10 @@ function createInitialPlayers(): Player[] {
       color: "#f97316",
       number: 1,
     },
-    {
-      id: "B-FP1",
-      team: "B",
-      role: "FP",
-      x: 8,
-      y: 3,
-      color: "#f97316",
-      number: 4,
-    },
-    {
-      id: "B-FP2",
-      team: "B",
-      role: "FP",
-      x: 8,
-      y: -3,
-      color: "#f97316",
-      number: 5,
-    },
-    {
-      id: "B-FP3",
-      team: "B",
-      role: "FP",
-      x: 4,
-      y: 2,
-      color: "#f97316",
-      number: 7,
-    },
-    {
-      id: "B-FP4",
-      team: "B",
-      role: "FP",
-      x: 4,
-      y: -2,
-      color: "#f97316",
-      number: 9,
-    },
+    { id: "B-FP1", team: "B", role: "FP", x: 8, y: 3, color: "#f97316", number: 4 },
+    { id: "B-FP2", team: "B", role: "FP", x: 8, y: -3, color: "#f97316", number: 5 },
+    { id: "B-FP3", team: "B", role: "FP", x: 4, y: 2, color: "#f97316", number: 7 },
+    { id: "B-FP4", team: "B", role: "FP", x: 4, y: -2, color: "#f97316", number: 9 },
   ];
 
   return [...teamA, ...teamB];
@@ -383,12 +324,91 @@ function sanitizeChapter(c: any): ChapterSnapshot | null {
   return { id, players, ball, boardRotation, lines };
 }
 
+/* =========================
+   ✅ Players helper（追加機能用）
+========================= */
+
+function clamp(v: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, v));
+}
+
+function nextUnusedNumber(players: Player[], team: TeamId): number {
+  const used = new Set(players.filter((p) => p.team === team).map((p) => p.number));
+  for (let n = 1; n <= 99; n++) {
+    if (!used.has(n)) return n;
+  }
+  return 99;
+}
+
+function nextId(players: Player[], team: TeamId, role: Role): string {
+  if (role === "GK") {
+    // GKは基本1人想定。既にいたら連番を付ける
+    const base = `${team}-GK`;
+    if (!players.some((p) => p.id === base)) return base;
+    let k = 2;
+    while (players.some((p) => p.id === `${base}${k}`)) k++;
+    return `${base}${k}`;
+  }
+  // FPは FP1, FP2... を埋める
+  let i = 1;
+  while (players.some((p) => p.id === `${team}-FP${i}`)) i++;
+  return `${team}-FP${i}`;
+}
+
+function defaultSpawn(players: Player[], team: TeamId, role: Role): { x: number; y: number } {
+  // 既存の見た目を崩しにくいように、左右の「よくある位置」に置く
+  const sameTeam = players.filter((p) => p.team === team);
+  const idx = sameTeam.length; // 0..（追加順）
+  const baseX = team === "A" ? -8 : 8;
+  const baseYList = [0, 3, -3, 2, -2, 5, -5, 1, -1];
+  const y = baseYList[idx % baseYList.length] ?? 0;
+  const x = role === "GK" ? (team === "A" ? BOUNDS.xMin + 2 : BOUNDS.xMax - 2) : baseX;
+
+  return {
+    x: clamp(x, BOUNDS.xMin + 0.6, BOUNDS.xMax - 0.6),
+    y: clamp(y, BOUNDS.yMin + 0.6, BOUNDS.yMax - 0.6),
+  };
+}
+
 export const useBoardStore = create<BoardState>((set, get) => ({
   players: createInitialPlayers(),
   ball: initialBall,
   boardRotation: 0,
   selectedId: null,
   mode3D: "camera",
+
+  // ✅ players edit
+  addPlayer: (team, role = "FP") => {
+    const cur = get().players;
+
+    const id = nextId(cur, team, role);
+    const number = nextUnusedNumber(cur, team);
+    const color = team === "A" ? "#0ea5e9" : "#f97316";
+    const { x, y } = defaultSpawn(cur, team, role);
+
+    const p: Player = { id, team, role, x, y, color, number };
+
+    set((s) => ({
+      players: [...s.players, p],
+      selectedId: id, // 追加したら選択
+    }));
+
+    return { ok: true, id };
+  },
+
+  removePlayer: (id) => {
+    set((s) => ({
+      players: s.players.filter((p) => p.id !== id),
+      selectedId: s.selectedId === id ? null : s.selectedId,
+    }));
+  },
+
+  setPlayerNumber: (id, number) => {
+    const n = Math.max(0, Math.min(99, Math.floor(Number(number) || 0)));
+    set((s) => ({
+      players: s.players.map((p) => (p.id === id ? { ...p, number: n } : p)),
+    }));
+  },
 
   chapters: [],
   activeChapterIndex: 0,
@@ -558,8 +578,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
       const ball = sanitizeBall(board.ball);
       const boardRotation = clampRot(board.boardRotation);
 
-      const mode3D: Mode3D =
-        board.mode3D === "piece" ? "piece" : "camera";
+      const mode3D: Mode3D = board.mode3D === "piece" ? "piece" : "camera";
 
       const activeChapterIndex = (() => {
         const n = Number(board.activeChapterIndex);
