@@ -6,6 +6,7 @@ import { useBoardStore, useDrawStore, useUiStore } from "./store";
 import type { Mode3D, TeamId, Role } from "./store";
 import SeoIntro from "./components/SeoIntro";
 import { t } from "./i18n";
+import PitchPage from "./components/PitchPage";
 
 type ViewMode = "2d" | "3d";
 type PlaybackSpeed = 0.5 | 1 | 2;
@@ -855,6 +856,9 @@ function ChapterPlayer({ playbackSpeed }: { playbackSpeed: PlaybackSpeed }) {
 export default function App() {
   const { lang, toggleLang } = useUiStore();
 
+  const page = new URLSearchParams(window.location.search).get("page");
+  const isPitch = page === "pitch";
+
   const [viewMode, setViewMode] = useState<ViewMode>("2d");
   const { mode3D, setMode3D } = useBoardStore();
 
@@ -943,9 +947,23 @@ export default function App() {
       <div className="flex flex-1 min-h-0">
         <Sidebar onOpenAnimation={() => setAnimOpen(true)} />
         <main ref={mainRef} className="flex-1 min-h-0 min-w-0 bg-slate-900 relative">
-          {viewMode === "2d" ? <Board2D /> : <Board3D />}
-          <SeoIntro />
+          {isPitch ? (
+            <PitchPage
+              lang={lang}
+              onOpenBoard={() => {
+                const url = new URL(window.location.href);
+                url.searchParams.delete("page");
+                window.location.href = url.toString();
+              }}
+            />
+          ) : (
+            <>
+              {viewMode === "2d" ? <Board2D /> : <Board3D />}
+              <SeoIntro />
+            </>
+          )}
         </main>
+
       </div>
 
       <AnimationPanel

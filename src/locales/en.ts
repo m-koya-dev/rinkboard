@@ -74,6 +74,34 @@ const en = {
   "lang.jp": "JP",
   "lang.en": "EN",
   "lang.toggleTitle": "Language",
+
+    // Pitch
+  "pitch.badge": "Free • Runs in your browser",
+  "pitch.title": "RinkBoard",
+  "pitch.subtitle": "Tactics board for Rink Hockey / Roller Hockey (2D/3D)",
+  "pitch.cta.open": "▶ Open Tactics Board",
+  "pitch.cta.copy": "Copy share link",
+  "pitch.section.what": "What is this?",
+  "pitch.section.what.body":
+    "RinkBoard is a tactics board for rink/roller hockey: build plays in 2D/3D, save up to 10 chapters, play animations, and export as video.",
+  "pitch.section.for": "Who is it for?",
+  "pitch.section.for.li1": "University teams to clubs",
+  "pitch.section.for.li2": "Coaches / analysts / team meetings",
+  "pitch.section.for.li3": "Demo for pro clubs & manufacturers",
+  "pitch.section.features": "Key features",
+  "pitch.section.features.li1": "Switch between 2D / 3D boards",
+  "pitch.section.features.li2": "Drag players and ball",
+  "pitch.section.features.li3": "Pen / Eraser + Undo / Redo",
+  "pitch.section.features.li4": "Save up to 10 chapters & play animations",
+  "pitch.section.features.li5": "Record and export MP4/WebM",
+  "pitch.section.how": "How to use (quick)",
+  "pitch.section.how.li1": "Move pieces and ball to set positions",
+  "pitch.section.how.li2": "Draw movements and notes",
+  "pitch.section.how.li3": "Save chapters → Play → Record",
+  "pitch.section.contact": "Contact",
+  "pitch.section.contact.body":
+    "For club/manufacturer demos, collaboration, or branding (logo/colors), please reach out.",
+
 };
 
 export default en;

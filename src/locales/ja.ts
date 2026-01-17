@@ -74,6 +74,36 @@ const ja = {
   "lang.jp": "JP",
   "lang.en": "EN",
   "lang.toggleTitle": "Language",
+
+    // Pitch
+  "pitch.badge": "無料・ブラウザで動作",
+  "pitch.title": "RinkBoard",
+  "pitch.subtitle": "リンクホッケー / ローラーホッケー向け 戦術ボード（2D/3D）",
+  "pitch.cta.open": "▶ 戦術ボードを開く",
+  "pitch.cta.copy": "共有リンクをコピー",
+  "pitch.section.what": "これは何？",
+  "pitch.section.what.body":
+    "RinkBoard は、リンクホッケー / ローラーホッケーの戦術を 2D / 3D で組み立て、チャプターで動きを再生し、動画として保存できる戦術ボードです。",
+  "pitch.section.for": "誰のため？",
+  "pitch.section.for.li1": "大学部活〜クラブチーム",
+  "pitch.section.for.li2": "コーチ / アナリスト / 選手ミーティング",
+  "pitch.section.for.li3": "海外クラブ・メーカーへの提案デモ",
+  "pitch.section.features": "主な機能",
+  "pitch.section.features.li1": "2D / 3D ボード切り替え",
+  "pitch.section.features.li2": "駒・ボールのドラッグ移動",
+  "pitch.section.features.li3": "ペン / 消しゴム + Undo / Redo",
+  "pitch.section.features.li4": "最大10チャプター保存・アニメ再生",
+  "pitch.section.features.li5": "録画してMP4/WebMで保存",
+  "pitch.section.how": "使い方（最短）",
+  "pitch.section.how.li1": "駒とボールを動かして配置を作る",
+  "pitch.section.how.li2": "ペンで動きや意図を描く",
+  "pitch.section.how.li3": "チャプターに保存して再生 → 録画",
+  "pitch.section.contact": "Contact",
+  "pitch.section.contact.body":
+    "クラブ・メーカー向けの導入相談、共同開発、ブランドカスタム（ロゴ/カラー）等はご連絡ください。",
+
 };
+
+
 
 export default ja;
