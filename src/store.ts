@@ -15,6 +15,46 @@ export type TeamId = "A" | "B";
 export type Role = "GK" | "FP";
 export type Mode3D = "camera" | "piece";
 
+// ===== UI（i18n） =====
+export type Lang = "ja" | "en";
+
+interface UiState {
+  lang: Lang;
+  setLang: (lang: Lang) => void;
+  toggleLang: () => void;
+}
+
+const UI_LS_KEY = "rinkboard_lang_v1";
+
+function safeLoadLang(): Lang {
+  try {
+    const raw = localStorage.getItem(UI_LS_KEY);
+    return raw === "en" ? "en" : "ja";
+  } catch {
+    return "ja";
+  }
+}
+
+export const useUiStore = create<UiState>((set, get) => ({
+  lang: safeLoadLang(),
+  setLang: (lang) => {
+    set({ lang });
+    try {
+      localStorage.setItem(UI_LS_KEY, lang);
+    } catch {
+      // localStorageが使えなくても落とさない
+    }
+  },
+  toggleLang: () => {
+    const next: Lang = get().lang === "ja" ? "en" : "ja";
+    set({ lang: next });
+    try {
+      localStorage.setItem(UI_LS_KEY, next);
+    } catch {}
+  },
+}));
+
+
 export interface Player {
   id: string;
   team: TeamId;

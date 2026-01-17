@@ -2,9 +2,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Board2D from "./boards/Board2D";
 import Board3D from "./boards/Board3D";
-import { useBoardStore, useDrawStore } from "./store";
+import { useBoardStore, useDrawStore, useUiStore } from "./store";
 import type { Mode3D, TeamId, Role } from "./store";
 import SeoIntro from "./components/SeoIntro";
+import { t } from "./i18n";
 
 type ViewMode = "2d" | "3d";
 type PlaybackSpeed = 0.5 | 1 | 2;
@@ -67,6 +68,8 @@ function Header({
   setMode3D,
   onOpenAnimation,
   onOpenPlayers,
+  lang,
+  toggleLang,
 }: {
   viewMode: ViewMode;
   setViewMode: (v: ViewMode) => void;
@@ -74,6 +77,8 @@ function Header({
   setMode3D: (m: Mode3D) => void;
   onOpenAnimation: () => void;
   onOpenPlayers: () => void;
+  lang: "ja" | "en";
+  toggleLang: () => void;
 }) {
   const { rotateBoard, resetPositions } = useBoardStore();
   const { undo, redo, clearAllLines } = useDrawStore();
@@ -100,7 +105,7 @@ function Header({
         </div>
         <div className="flex flex-col leading-tight">
           <span className="text-sm font-semibold text-slate-50">RinkBoard</span>
-          <span className="text-[11px] text-slate-400">Roller Hockey Tactics Board</span>
+          <span className="text-[11px] text-slate-400">{t(lang, "header.subtitle")}</span>
         </div>
       </div>
 
@@ -111,30 +116,30 @@ function Header({
             className={viewMode === "2d" ? activeTab : inactiveTab}
             onClick={() => setViewMode("2d")}
           >
-            2D View
+            {t(lang, "header.view.2d")}
           </button>
           <button
             className={viewMode === "3d" ? activeTab : inactiveTab}
             onClick={() => setViewMode("3d")}
           >
-            3D View
+            {t(lang, "header.view.3d")}
           </button>
         </div>
 
         {viewMode === "3d" && (
           <div className="flex items-center gap-2 text-[11px] text-slate-300">
-            <span className="text-[10px] text-slate-400">3D 操作:</span>
+            <span className="text-[10px] text-slate-400">{t(lang, "header.mode3d.label")}</span>
             <button
               className={mode3D === "camera" ? mode3DActive : mode3DInactive}
               onClick={() => setMode3D("camera")}
             >
-              Camera
+              {t(lang, "header.mode3d.camera")}
             </button>
             <button
               className={mode3D === "piece" ? mode3DActive : mode3DInactive}
               onClick={() => setMode3D("piece")}
             >
-              Pieces
+              {t(lang, "header.mode3d.pieces")}
             </button>
           </div>
         )}
@@ -144,17 +149,17 @@ function Header({
       <div className="flex items-center gap-2">
         {/* ★位置を変えない（あなたの指定） */}
         <button className={buttonBase} onClick={onOpenAnimation}>
-          🎞 Animation
+          {t(lang, "header.btn.animation")}
         </button>
 
         <button className={buttonBase} onClick={undo}>
-          ⬅︎ Undo
+          {t(lang, "header.btn.undo")}
         </button>
         <button className={buttonBase} onClick={redo}>
-          ➝ Redo
+          {t(lang, "header.btn.redo")}
         </button>
         <button className={buttonBase} onClick={rotateBoard}>
-          ⟳ Rotate
+          {t(lang, "header.btn.rotate")}
         </button>
         <button
           className={buttonBase}
@@ -163,12 +168,17 @@ function Header({
             resetPositions();
           }}
         >
-          Reset
+          {t(lang, "header.btn.reset")}
         </button>
 
         {/* ✅追加：Players（既存の並びは壊さず末尾に追加） */}
         <button className={buttonBase} onClick={onOpenPlayers} title="Add / Remove / Number">
-          👥 Players
+          {t(lang, "header.btn.players")}
+        </button>
+
+        {/* ✅追加：Language toggle（さらに末尾に追加＝並びを壊さない） */}
+        <button className={buttonBase} onClick={toggleLang} title={t(lang, "lang.toggleTitle")}>
+          {lang === "ja" ? t(lang, "lang.en") : t(lang, "lang.jp")}
         </button>
       </div>
     </header>
@@ -176,13 +186,11 @@ function Header({
 }
 
 function Sidebar({ onOpenAnimation }: { onOpenAnimation: () => void }) {
-  const { activeTool, setTool, penColor, penWidth, setPenColor, setPenWidth } =
-    useDrawStore();
+  const { activeTool, setTool, penColor, penWidth, setPenColor, setPenWidth } = useDrawStore();
 
   const itemBase =
     "w-full flex flex-col items-center gap-1 px-2 py-3 text-[11px] cursor-pointer border-l-2 transition";
-  const activeItem =
-    itemBase + " border-emerald-400 bg-emerald-500/10 text-emerald-300";
+  const activeItem = itemBase + " border-emerald-400 bg-emerald-500/10 text-emerald-300";
   const inactiveItem =
     itemBase + " border-transparent text-slate-300 hover:bg:white/5 hover:border-slate-600";
 
@@ -211,10 +219,7 @@ function Sidebar({ onOpenAnimation }: { onOpenAnimation: () => void }) {
     }
 
     return (
-      <button
-        className={activeTool === id ? activeItem : inactiveItem}
-        onClick={() => setTool(id)}
-      >
+      <button className={activeTool === id ? activeItem : inactiveItem} onClick={() => setTool(id)}>
         <span className="text-lg">{icon}</span>
         <span>{label}</span>
       </button>
@@ -319,8 +324,7 @@ function AnimationPanel({
     return fixed;
   }, [chapters]);
 
-  const baseBtn =
-    "px-2 py-1 rounded-md text-xs border border-white/15 hover:bg-white/10 transition";
+  const baseBtn = "px-2 py-1 rounded-md text-xs border border-white/15 hover:bg-white/10 transition";
   const primary =
     "px-3 py-1 rounded-md text-xs font-medium bg-emerald-500 text-slate-900 hover:bg-emerald-400 transition";
   const danger =
@@ -344,10 +348,7 @@ function AnimationPanel({
       const obj = exportAllToObject();
       const json = JSON.stringify(obj, null, 2);
       const blob = new Blob([json], { type: "application/json" });
-      downloadBlob(
-        blob,
-        `rinkboard-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.json`
-      );
+      downloadBlob(blob, `rinkboard-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.json`);
       setToast("JSONを書き出しました（ダウンロード）");
       setTimeout(() => setToast(null), 2000);
     } catch {
@@ -394,16 +395,10 @@ function AnimationPanel({
             <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800">
               <div className="flex items-center gap-2">
                 <div className="w-10 h-1.5 rounded-full bg-slate-600/70" />
-                <span className="text-sm text-slate-100 font-semibold">
-                  Animation / Chapters
-                </span>
+                <span className="text-sm text-slate-100 font-semibold">Animation / Chapters</span>
                 <span className="text-[11px] text-slate-400">（最大10）</span>
               </div>
-              <button
-                className="text-slate-300 hover:text-white text-sm"
-                onClick={onClose}
-                title="Close"
-              >
+              <button className="text-slate-300 hover:text-white text-sm" onClick={onClose} title="Close">
                 ✕
               </button>
             </div>
@@ -512,9 +507,7 @@ function AnimationPanel({
                   />
                 </label>
 
-                <span className="text-[11px] text-slate-500">
-                  （自動保存も有効：ブラウザに保存されます）
-                </span>
+                <span className="text-[11px] text-slate-500">（自動保存も有効：ブラウザに保存されます）</span>
               </div>
 
               <div className="mt-3 text-[11px] text-slate-400 leading-relaxed">
@@ -542,13 +535,11 @@ function PlayersPanel({
   onClose: () => void;
 }) {
   const isMobile = useIsMobile();
-  const { players, selectedId, selectPlayer, addPlayer, removePlayer, setPlayerNumber } =
-    useBoardStore();
+  const { players, selectedId, selectPlayer, addPlayer, removePlayer, setPlayerNumber } = useBoardStore();
 
   const selected = players.find((p) => p.id === selectedId) ?? null;
 
-  const baseBtn =
-    "px-2 py-1 rounded-md text-xs border border-white/15 hover:bg-white/10 transition";
+  const baseBtn = "px-2 py-1 rounded-md text-xs border border-white/15 hover:bg-white/10 transition";
   const primary =
     "px-3 py-1 rounded-md text-xs font-medium bg-emerald-500 text-slate-900 hover:bg-emerald-400 transition";
   const danger =
@@ -587,11 +578,7 @@ function PlayersPanel({
                 <span className="text-sm text-slate-100 font-semibold">Players</span>
                 <span className="text-[11px] text-slate-400">（追加 / 削除 / 背番号）</span>
               </div>
-              <button
-                className="text-slate-300 hover:text-white text-sm"
-                onClick={onClose}
-                title="Close"
-              >
+              <button className="text-slate-300 hover:text-white text-sm" onClick={onClose} title="Close">
                 ✕
               </button>
             </div>
@@ -612,19 +599,11 @@ function PlayersPanel({
 
                 <div className="flex items-center gap-2">
                   {!addPicking ? (
-                    <button
-                      className={primary}
-                      onClick={() => setAddPicking(true)}
-                      title="Add player"
-                    >
+                    <button className={primary} onClick={() => setAddPicking(true)} title="Add player">
                       + Add
                     </button>
                   ) : (
-                    <button
-                      className={baseBtn}
-                      onClick={() => setAddPicking(false)}
-                      title="Cancel"
-                    >
+                    <button className={baseBtn} onClick={() => setAddPicking(false)} title="Cancel">
                       Cancel
                     </button>
                   )}
@@ -648,9 +627,7 @@ function PlayersPanel({
               {addPicking && (
                 <div className="mt-3 p-3 rounded-lg border border-white/10 bg-white/5">
                   <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div className="text-xs text-slate-300">
-                      Add player: teamを選んでください
-                    </div>
+                    <div className="text-xs text-slate-300">Add player: teamを選んでください</div>
 
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] text-slate-400">Role</span>
@@ -687,7 +664,8 @@ function PlayersPanel({
                   </div>
 
                   <div className="mt-2 text-[11px] text-slate-400 leading-relaxed">
-                    ・背番号は「チーム内で未使用の最小番号」を自動で付与します<br />
+                    ・背番号は「チーム内で未使用の最小番号」を自動で付与します
+                    <br />
                     ・追加した駒は自動で選択されます
                   </div>
                 </div>
@@ -708,9 +686,7 @@ function PlayersPanel({
                   }}
                   className="w-24 text-xs bg-slate-900 border border-white/15 rounded px-2 py-1 text-slate-100 disabled:opacity-50"
                 />
-                <span className="text-[11px] text-slate-500">
-                  （選択中の駒だけ変更できます）
-                </span>
+                <span className="text-[11px] text-slate-500">（選択中の駒だけ変更できます）</span>
               </div>
 
               {/* 一覧（クリックで選択） */}
@@ -724,19 +700,13 @@ function PlayersPanel({
                         key={p.id}
                         className={[
                           "text-left px-3 py-2 rounded-lg border transition",
-                          active
-                            ? "border-emerald-400 bg-emerald-500/10"
-                            : "border-white/10 bg-white/5 hover:bg-white/10",
+                          active ? "border-emerald-400 bg-emerald-500/10" : "border-white/10 bg-white/5 hover:bg-white/10",
                         ].join(" ")}
                         onClick={() => selectPlayer(active ? null : p.id)}
                       >
                         <div className="flex items-center justify-between">
-                          <div className="text-xs text-slate-100 font-semibold">
-                            {p.id}
-                          </div>
-                          <div className="text-[11px] text-slate-400">
-                            #{p.number}
-                          </div>
+                          <div className="text-xs text-slate-100 font-semibold">{p.id}</div>
+                          <div className="text-[11px] text-slate-400">#{p.number}</div>
                         </div>
                         <div className="mt-0.5 text-[11px] text-slate-400">
                           Team {p.team} / {p.role} ・ ({p.x.toFixed(1)}, {p.y.toFixed(1)})
@@ -748,7 +718,8 @@ function PlayersPanel({
               </div>
 
               <div className="mt-3 text-[11px] text-slate-500 leading-relaxed">
-                ・削除してもチャプターや線は消えません（既存仕様を維持）<br />
+                ・削除してもチャプターや線は消えません（既存仕様を維持）
+                <br />
                 ・再生中（Play中）に追加/削除をすると意図とズレる可能性があるので、基本は停止中推奨
               </div>
             </div>
@@ -760,13 +731,8 @@ function PlayersPanel({
 }
 
 function ChapterPlayer({ playbackSpeed }: { playbackSpeed: PlaybackSpeed }) {
-  const {
-    chapters,
-    isPlayingChapters,
-    stopPlayChapters,
-    applySnapshotInstant,
-    setPlayersAndBall,
-  } = useBoardStore();
+  const { chapters, isPlayingChapters, stopPlayChapters, applySnapshotInstant, setPlayersAndBall } =
+    useBoardStore();
 
   const slots = useMemo(() => {
     const fixed = Array(10).fill(null) as (typeof chapters[number] | null)[];
@@ -792,8 +758,7 @@ function ChapterPlayer({ playbackSpeed }: { playbackSpeed: PlaybackSpeed }) {
 
     // speed: 2x => 時間を1/2、0.5x => 時間を2倍
     const timeScale = 1 / playbackSpeed;
-    const sleep = (ms: number) =>
-      new Promise<void>((r) => setTimeout(r, Math.max(0, ms * timeScale)));
+    const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, Math.max(0, ms * timeScale)));
 
     const animateBetween = async (fromIdx: number, toIdx: number) => {
       const from = seq[fromIdx];
@@ -819,8 +784,8 @@ function ChapterPlayer({ playbackSpeed }: { playbackSpeed: PlaybackSpeed }) {
       const frame = (now: number) => {
         if (cancelled) return;
 
-        const t = Math.min(1, (now - start) / duration);
-        const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        const t01 = Math.min(1, (now - start) / duration);
+        const eased = t01 < 0.5 ? 2 * t01 * t01 : 1 - Math.pow(-2 * t01 + 2, 2) / 2;
 
         const nextPlayers = to.players.map((tp) => {
           const fp = fromMap.get(tp.id) ?? tp;
@@ -839,7 +804,7 @@ function ChapterPlayer({ playbackSpeed }: { playbackSpeed: PlaybackSpeed }) {
 
         setPlayersAndBall(nextPlayers, nextBall);
 
-        if (t < 1) requestAnimationFrame(frame);
+        if (t01 < 1) requestAnimationFrame(frame);
       };
 
       requestAnimationFrame(frame);
@@ -882,19 +847,14 @@ function ChapterPlayer({ playbackSpeed }: { playbackSpeed: PlaybackSpeed }) {
     return () => {
       cancelled = true;
     };
-  }, [
-    isPlayingChapters,
-    slots,
-    stopPlayChapters,
-    applySnapshotInstant,
-    setPlayersAndBall,
-    playbackSpeed,
-  ]);
+  }, [isPlayingChapters, slots, stopPlayChapters, applySnapshotInstant, setPlayersAndBall, playbackSpeed]);
 
   return null;
 }
 
 export default function App() {
+  const { lang, toggleLang } = useUiStore();
+
   const [viewMode, setViewMode] = useState<ViewMode>("2d");
   const { mode3D, setMode3D } = useBoardStore();
 
@@ -974,6 +934,8 @@ export default function App() {
         setMode3D={setMode3D}
         onOpenAnimation={() => setAnimOpen(true)}
         onOpenPlayers={() => setPlayersOpen(true)}
+        lang={lang}
+        toggleLang={toggleLang}
       />
 
       <ChapterPlayer playbackSpeed={playbackSpeed} />
