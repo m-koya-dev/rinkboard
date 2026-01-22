@@ -7,6 +7,7 @@ import type { Mode3D, TeamId, Role } from "./store";
 import SeoIntro from "./components/SeoIntro";
 import { t } from "./i18n";
 import PitchPage from "./components/PitchPage";
+import { decodeStateFromParam, encodeStateToParam } from "./share";
 
 type ViewMode = "2d" | "3d";
 type PlaybackSpeed = 0.5 | 1 | 2;
@@ -33,11 +34,7 @@ function pickBestMimeType(): { mimeType?: string; ext: "mp4" | "webm" } {
   ];
 
   // WebM候補（Chrome/Edgeで通りやすい）
-  const webmCandidates = [
-    "video/webm;codecs=vp9,opus",
-    "video/webm;codecs=vp8,opus",
-    "video/webm",
-  ];
+  const webmCandidates = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
 
   if (typeof MediaRecorder === "undefined") {
     return { ext: "webm" };
@@ -86,8 +83,7 @@ function Header({
 
   const tabBase = "px-3 py-1 rounded-full text-sm font-medium border transition";
   const activeTab = tabBase + " bg-emerald-500 text-white border-emerald-500";
-  const inactiveTab =
-    tabBase + " bg-white/5 text-slate-100 border-white/10 hover:bg-white/10";
+  const inactiveTab = tabBase + " bg-white/5 text-slate-100 border-white/10 hover:bg-white/10";
 
   const buttonBase =
     "inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium border border-white/15 text-slate-100 hover:bg-white/10 transition";
@@ -98,7 +94,7 @@ function Header({
     mode3DBase + " bg-white/5 text-slate-100 border-white/10 hover:bg-white/10";
 
   return (
-    <header className="flex items-center justify-between px-4 py- 1  bg-slate-900/95 border-b border-slate-800">
+    <header className="flex items-center justify-between px-4 py-1 bg-slate-900/95 border-b border-slate-800">
       {/* 左：ロゴ */}
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center font-bold text-slate-900">
@@ -113,16 +109,10 @@ function Header({
       {/* 中央：ビュー切り替え + 3D操作モード */}
       <div className="flex flex-col items-center gap-1">
         <div className="bg-slate-800/80 border border-slate-700 rounded-full p-1 flex items-center gap-1">
-          <button
-            className={viewMode === "2d" ? activeTab : inactiveTab}
-            onClick={() => setViewMode("2d")}
-          >
+          <button className={viewMode === "2d" ? activeTab : inactiveTab} onClick={() => setViewMode("2d")}>
             {t(lang, "header.view.2d")}
           </button>
-          <button
-            className={viewMode === "3d" ? activeTab : inactiveTab}
-            onClick={() => setViewMode("3d")}
-          >
+          <button className={viewMode === "3d" ? activeTab : inactiveTab} onClick={() => setViewMode("3d")}>
             {t(lang, "header.view.3d")}
           </button>
         </div>
@@ -130,16 +120,10 @@ function Header({
         {viewMode === "3d" && (
           <div className="flex items-center gap-2 text-[11px] text-slate-300">
             <span className="text-[10px] text-slate-400">{t(lang, "header.mode3d.label")}</span>
-            <button
-              className={mode3D === "camera" ? mode3DActive : mode3DInactive}
-              onClick={() => setMode3D("camera")}
-            >
+            <button className={mode3D === "camera" ? mode3DActive : mode3DInactive} onClick={() => setMode3D("camera")}>
               {t(lang, "header.mode3d.camera")}
             </button>
-            <button
-              className={mode3D === "piece" ? mode3DActive : mode3DInactive}
-              onClick={() => setMode3D("piece")}
-            >
+            <button className={mode3D === "piece" ? mode3DActive : mode3DInactive} onClick={() => setMode3D("piece")}>
               {t(lang, "header.mode3d.pieces")}
             </button>
           </div>
@@ -172,12 +156,12 @@ function Header({
           {t(lang, "header.btn.reset")}
         </button>
 
-        {/* ✅追加：Players（既存の並びは壊さず末尾に追加） */}
+        {/* ✅追加：Players */}
         <button className={buttonBase} onClick={onOpenPlayers} title="Add / Remove / Number">
           {t(lang, "header.btn.players")}
         </button>
 
-        {/* ✅追加：Language toggle（さらに末尾に追加＝並びを壊さない） */}
+        {/* ✅追加：Language toggle */}
         <button className={buttonBase} onClick={toggleLang} title={t(lang, "lang.toggleTitle")}>
           {lang === "ja" ? t(lang, "lang.en") : t(lang, "lang.jp")}
         </button>
@@ -189,11 +173,9 @@ function Header({
 function Sidebar({ onOpenAnimation }: { onOpenAnimation: () => void }) {
   const { activeTool, setTool, penColor, penWidth, setPenColor, setPenWidth } = useDrawStore();
 
-  const itemBase =
-    "w-full flex flex-col items-center gap-1 px-2 py-3 text-[11px] cursor-pointer border-l-2 transition";
+  const itemBase = "w-full flex flex-col items-center gap-1 px-2 py-3 text-[11px] cursor-pointer border-l-2 transition";
   const activeItem = itemBase + " border-emerald-400 bg-emerald-500/10 text-emerald-300";
-  const inactiveItem =
-    itemBase + " border-transparent text-slate-300 hover:bg:white/5 hover:border-slate-600";
+  const inactiveItem = itemBase + " border-transparent text-slate-300 hover:bg:white/5 hover:border-slate-600";
 
   const disabledItem =
     "w-full flex flex-col items-center gap-1 px-2 py-3 text-[11px] border-l-2 border-transparent text-slate-500 opacity-60 cursor-not-allowed";
@@ -234,11 +216,8 @@ function Sidebar({ onOpenAnimation }: { onOpenAnimation: () => void }) {
         <ToolButton id="pen" label="Pen" icon="✏️" />
         <ToolButton id="eraser" label="Eraser" icon="🧽" />
 
-        {/* ✅ Animeボタンは無効（Arrow/Text）より上（あなたの指定維持） */}
         <button
-          className={
-            "mt-2 w-full flex flex-col items-center gap-1 px-2 py-3 text-[11px] cursor-pointer border-l-2 border-transparent text-slate-300 hover:bg:white/5 hover:border-slate-600 transition"
-          }
+          className="mt-2 w-full flex flex-col items-center gap-1 px-2 py-3 text-[11px] cursor-pointer border-l-2 border-transparent text-slate-300 hover:bg:white/5 hover:border-slate-600 transition"
           onClick={onOpenAnimation}
           title="Chapters / Animation"
         >
@@ -246,7 +225,6 @@ function Sidebar({ onOpenAnimation }: { onOpenAnimation: () => void }) {
           <span>Anime</span>
         </button>
 
-        {/* ★未実装なので無効化 */}
         <ToolButton id="arrow" label="Arrow" icon="➡️" disabled />
         <ToolButton id="text" label="Text" icon="🅣" disabled />
       </div>
@@ -292,6 +270,8 @@ function AnimationPanel({
   recordExt,
   playbackSpeed,
   setPlaybackSpeed,
+  onCopyShareLink,
+  shareCopied,
 }: {
   open: boolean;
   onClose: () => void;
@@ -301,6 +281,8 @@ function AnimationPanel({
   recordExt: "mp4" | "webm";
   playbackSpeed: PlaybackSpeed;
   setPlaybackSpeed: (s: PlaybackSpeed) => void;
+  onCopyShareLink: () => void;
+  shareCopied: boolean;
 }) {
   const isMobile = useIsMobile();
   const {
@@ -334,9 +316,7 @@ function AnimationPanel({
   const slotBtn = (active: boolean, saved: boolean) =>
     [
       "w-8 h-8 rounded-md text-xs font-semibold border transition",
-      active
-        ? "bg-sky-500 text-white border-sky-400"
-        : "bg-white/5 text-slate-100 border-white/10 hover:bg-white/10",
+      active ? "bg-sky-500 text-white border-sky-400" : "bg-white/5 text-slate-100 border-white/10 hover:bg-white/10",
       saved ? "ring-1 ring-emerald-400/60" : "",
     ].join(" ");
 
@@ -375,9 +355,7 @@ function AnimationPanel({
   const speedBtn = (s: PlaybackSpeed) =>
     [
       "px-2 py-1 rounded-md text-xs border transition",
-      s === playbackSpeed
-        ? "bg-emerald-400 text-slate-900 border-emerald-300"
-        : "bg-white/5 text-slate-100 border-white/10 hover:bg-white/10",
+      s === playbackSpeed ? "bg-emerald-400 text-slate-900 border-emerald-300" : "bg-white/5 text-slate-100 border-white/10 hover:bg-white/10",
     ].join(" ");
 
   return (
@@ -487,12 +465,10 @@ function AnimationPanel({
                     ■ Stop & Save
                   </button>
                 )}
-                <span className="text-[11px] text-slate-500">
-                  ※MP4はブラウザ対応次第。非対応環境はWebMで保存されます。
-                </span>
+                <span className="text-[11px] text-slate-500">※MP4はブラウザ対応次第。非対応環境はWebMで保存されます。</span>
               </div>
 
-              {/* JSON Export/Import */}
+              {/* JSON Export/Import + Share */}
               <div className="mt-3 flex items-center gap-2 flex-wrap">
                 <button className={baseBtn} onClick={downloadJSON}>
                   ⬇ Export JSON
@@ -500,13 +476,14 @@ function AnimationPanel({
 
                 <label className={baseBtn + " cursor-pointer"}>
                   ⬆ Import JSON
-                  <input
-                    type="file"
-                    accept="application/json"
-                    className="hidden"
-                    onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
-                  />
+                  <input type="file" accept="application/json" className="hidden" onChange={(e) => onPickFile(e.target.files?.[0] ?? null)} />
                 </label>
+
+                <button className={baseBtn} onClick={onCopyShareLink}>
+                  🔗 Copy Share Link
+                </button>
+
+                {shareCopied && <span className="text-[11px] text-emerald-200">Copied!</span>}
 
                 <span className="text-[11px] text-slate-500">（自動保存も有効：ブラウザに保存されます）</span>
               </div>
@@ -527,14 +504,7 @@ function AnimationPanel({
 /* =========================
    ✅ Players Panel（追加）
 ========================= */
-
-function PlayersPanel({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
+function PlayersPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const isMobile = useIsMobile();
   const { players, selectedId, selectPlayer, addPlayer, removePlayer, setPlayerNumber } = useBoardStore();
 
@@ -543,12 +513,10 @@ function PlayersPanel({
   const baseBtn = "px-2 py-1 rounded-md text-xs border border-white/15 hover:bg-white/10 transition";
   const primary =
     "px-3 py-1 rounded-md text-xs font-medium bg-emerald-500 text-slate-900 hover:bg-emerald-400 transition";
-  const danger =
-    "px-3 py-1 rounded-md text-xs font-medium bg-rose-500 text-white hover:bg-rose-400 transition";
+  const danger = "px-3 py-1 rounded-md text-xs font-medium bg-rose-500 text-white hover:bg-rose-400 transition";
 
   const maxH = isMobile ? "max-h-[45vh]" : "max-h-[38vh]";
 
-  // Addフロー：Add押下→チーム選択
   const [addPicking, setAddPicking] = useState(false);
   const [addRole, setAddRole] = useState<Role>("FP");
 
@@ -585,7 +553,6 @@ function PlayersPanel({
             </div>
 
             <div className={["px-4 py-3 overflow-auto", maxH].join(" ")}>
-              {/* 上段：選択中 */}
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className="text-[12px] text-slate-200">
                   Selected:{" "}
@@ -624,7 +591,6 @@ function PlayersPanel({
                 </div>
               </div>
 
-              {/* Add → team選択（仕様どおり） */}
               {addPicking && (
                 <div className="mt-3 p-3 rounded-lg border border-white/10 bg-white/5">
                   <div className="flex items-center justify-between flex-wrap gap-2">
@@ -672,7 +638,6 @@ function PlayersPanel({
                 </div>
               )}
 
-              {/* 背番号変更 */}
               <div className="mt-4 flex items-center gap-3 flex-wrap">
                 <div className="text-xs text-slate-300">背番号</div>
                 <input
@@ -690,7 +655,6 @@ function PlayersPanel({
                 <span className="text-[11px] text-slate-500">（選択中の駒だけ変更できます）</span>
               </div>
 
-              {/* 一覧（クリックで選択） */}
               <div className="mt-4">
                 <div className="text-[11px] text-slate-400 mb-2">Players list</div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -732,8 +696,7 @@ function PlayersPanel({
 }
 
 function ChapterPlayer({ playbackSpeed }: { playbackSpeed: PlaybackSpeed }) {
-  const { chapters, isPlayingChapters, stopPlayChapters, applySnapshotInstant, setPlayersAndBall } =
-    useBoardStore();
+  const { chapters, isPlayingChapters, stopPlayChapters, applySnapshotInstant, setPlayersAndBall } = useBoardStore();
 
   const slots = useMemo(() => {
     const fixed = Array(10).fill(null) as (typeof chapters[number] | null)[];
@@ -776,7 +739,7 @@ function ChapterPlayer({ playbackSpeed }: { playbackSpeed: PlaybackSpeed }) {
       if (cancelled) return;
 
       const baseDuration = 900;
-      const duration = Math.max(120, baseDuration * timeScale); // 速すぎて破綻しない保険
+      const duration = Math.max(120, baseDuration * timeScale);
       const start = performance.now();
 
       const fromMap = new Map(from.players.map((p) => [p.id, p]));
@@ -856,19 +819,83 @@ function ChapterPlayer({ playbackSpeed }: { playbackSpeed: PlaybackSpeed }) {
 export default function App() {
   const { lang, toggleLang } = useUiStore();
 
-  const page = new URLSearchParams(window.location.search).get("page");
-  const isPitch = page === "pitch";
+  // ✅ URLパラメータ初回読み取り（s がある時は pitch より復元を優先）
+  const sp0 = new URLSearchParams(window.location.search);
+  const s0 = sp0.get("s");
+  const page0 = sp0.get("page");
+  const isPitch = page0 === "pitch" && !s0;
+
+  // ✅ 共有URLの ?s= から状態を復元（初回だけ）
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const s = sp.get("s");
+    if (!s) return;
+
+    try {
+      const data = decodeStateFromParam(s);
+      const res = useBoardStore.getState().importAllFromObject(data);
+
+      if (res.ok) {
+        sp.delete("s");
+        sp.delete("page");
+        const url = new URL(window.location.href);
+        url.search = sp.toString();
+        window.history.replaceState({}, "", url.toString());
+      }
+    } catch {
+      // 壊れたURLでも落とさない
+    }
+  }, []);
 
   const [viewMode, setViewMode] = useState<ViewMode>("2d");
   const { mode3D, setMode3D } = useBoardStore();
 
   const [animOpen, setAnimOpen] = useState(false);
 
-  // ✅ 再生速度（0.5 / 1 / 2）
+  // ✅ 再生速度
   const [playbackSpeed, setPlaybackSpeed] = useState<PlaybackSpeed>(1);
 
   // ✅ Players Panel
   const [playersOpen, setPlayersOpen] = useState(false);
+
+  // ✅ Share link copied
+  const [shareCopied, setShareCopied] = useState(false);
+
+  const copyShareLink = async () => {
+    try {
+      const obj = useBoardStore.getState().exportAllToObject();
+      const s = encodeStateToParam(obj);
+
+      const url = new URL(window.location.href);
+      url.searchParams.set("s", s);
+      url.searchParams.delete("page"); // pitch共有はしない
+
+      await navigator.clipboard.writeText(url.toString());
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 1500);
+    } catch {
+      // clipboardがダメな環境用フォールバック
+      try {
+        const obj = useBoardStore.getState().exportAllToObject();
+        const s = encodeStateToParam(obj);
+        const url = new URL(window.location.href);
+        url.searchParams.set("s", s);
+        url.searchParams.delete("page");
+
+        const ta = document.createElement("textarea");
+        ta.value = url.toString();
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+
+        setShareCopied(true);
+        setTimeout(() => setShareCopied(false), 1500);
+      } catch {
+        // 失敗しても落とさない
+      }
+    }
+  };
 
   // 録画
   const mainRef = useRef<HTMLDivElement | null>(null);
@@ -897,15 +924,10 @@ export default function App() {
       };
 
       rec.onstop = () => {
-        const blob = new Blob(chunksRef.current, {
-          type: mimeType ?? "video/webm",
-        });
-
+        const blob = new Blob(chunksRef.current, { type: mimeType ?? "video/webm" });
         const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
         const filename = `rinkboard-animation-${stamp}.${recordExt}`;
-
         downloadBlob(blob, filename);
-
         stream.getTracks().forEach((t) => t.stop());
       };
 
@@ -963,7 +985,6 @@ export default function App() {
             </>
           )}
         </main>
-
       </div>
 
       <AnimationPanel
@@ -975,6 +996,8 @@ export default function App() {
         recordExt={recordExt}
         playbackSpeed={playbackSpeed}
         setPlaybackSpeed={setPlaybackSpeed}
+        onCopyShareLink={copyShareLink}
+        shareCopied={shareCopied}
       />
 
       <PlayersPanel open={playersOpen} onClose={() => setPlayersOpen(false)} />

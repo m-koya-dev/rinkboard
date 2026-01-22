@@ -1,6 +1,9 @@
-import { useMemo, useState } from "react";
+// src/components/PitchPage.tsx
+import { useState } from "react";
 import type { Lang } from "../i18n";
 import { t } from "../i18n";
+import { useBoardStore } from "../store";
+import { encodeStateToParam } from "../share";
 
 export default function PitchPage({
   lang,
@@ -11,13 +14,21 @@ export default function PitchPage({
 }) {
   const [copied, setCopied] = useState(false);
 
-  const shareUrl = useMemo(() => {
+  const buildShareUrl = () => {
     const url = new URL(window.location.href);
     url.searchParams.delete("page"); // pitch自体を共有しない（ボード側を共有）
+
+    // ✅ 最新の盤面をURLに埋め込む
+    const data = useBoardStore.getState().exportAllToObject();
+    const packed = encodeStateToParam(data);
+    url.searchParams.set("s", packed);
+
     return url.toString();
-  }, []);
+  };
 
   const copy = async () => {
+    const shareUrl = buildShareUrl();
+
     try {
       await navigator.clipboard.writeText(shareUrl);
       setCopied(true);
@@ -39,13 +50,7 @@ export default function PitchPage({
     }
   };
 
-  const Card = ({
-    title,
-    children,
-  }: {
-    title: string;
-    children: React.ReactNode;
-  }) => (
+  const Card = ({ title, children }: { title: string; children: React.ReactNode }) => (
     <section className="rounded-2xl border border-white/10 bg-white/5 p-4 md:p-5">
       <h2 className="text-sm md:text-base font-semibold text-slate-50">{title}</h2>
       <div className="mt-2 text-sm text-slate-300 leading-relaxed">{children}</div>
@@ -79,9 +84,7 @@ export default function PitchPage({
           <h1 className="text-3xl md:text-4xl font-extrabold text-slate-50 tracking-tight">
             {t(lang, "pitch.title")}
           </h1>
-          <p className="text-slate-300 text-sm md:text-base">
-            {t(lang, "pitch.subtitle")}
-          </p>
+          <p className="text-slate-300 text-sm md:text-base">{t(lang, "pitch.subtitle")}</p>
 
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <button
@@ -94,7 +97,7 @@ export default function PitchPage({
             <button
               onClick={copy}
               className="px-4 py-2 rounded-xl border border-white/15 bg-white/5 text-slate-100 hover:bg-white/10 transition"
-              title={shareUrl}
+              title="Copy share link (includes current state)"
             >
               {t(lang, "pitch.cta.copy")}
             </button>
