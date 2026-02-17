@@ -1,10 +1,10 @@
 // src/boards/Board2D.tsx
-import  {
+import {
   forwardRef,
   useEffect,
   useImperativeHandle,
   useRef,
-  useState,
+  useState, // ✅追加
 } from "react";
 import { Stage, Layer, Rect, Line, Circle, Group, Text } from "react-konva";
 import type Konva from "konva";
@@ -95,6 +95,13 @@ function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
 }
 
+// テキスト枠（雑に見積もり：prompt版ならこれで十分）
+function estimateTextBoxPx(text: string, fontSize: number) {
+  const w = Math.max(20, text.length * fontSize * 0.55);
+  const h = Math.max(14, fontSize * 1.2);
+  return { w, h };
+}
+
 function PlayerToken({
   id,
   x,
@@ -166,8 +173,67 @@ const Board2D = forwardRef<Board2DHandle>(function Board2D(_props, ref) {
 
   const { toLocal, toWorld } = makeConverters(worldW, worldH, scale);
 
-  const { lines, penEnabled, eraserEnabled, penColor, penWidth, addLine, eraseLine } =
-    useDrawStore();
+  // ✅ DrawStore（Textも含めて使う）
+  const {
+    lines,
+    texts,
+    penEnabled,
+    eraserEnabled,
+    activeTool,
+    penColor,
+    penWidth,
+
+    textColor,
+    textSize,
+    selectedTextId,
+
+    addLine,
+    eraseLine,
+
+    addText,
+    updateText,
+    removeText,
+    selectText,
+    setTool,
+  } = useDrawStore();
+
+  // ✅ 選択テキスト削除（Delete / Backspace）+ Escで解除
+useEffect(() => {
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (!selectedTextId) return;
+
+    if (e.key === "Delete" || e.key === "Backspace") {
+      e.preventDefault();
+      removeText(selectedTextId);
+      return;
+    }
+    if (e.key === "Escape") {
+      selectText(null);
+      return;
+    }
+  };
+
+  window.addEventListener("keydown", onKeyDown);
+  return () => window.removeEventListener("keydown", onKeyDown);
+}, [selectedTextId, removeText, selectText]);
+
+// ✅ Ctrl + Wheel で文字サイズ調整（選択中のみ）
+const handleWheel = (e: any) => {
+  if (!selectedTextId) return;
+
+  const evt = e.evt as WheelEvent;
+  if (!evt.ctrlKey) return;
+
+  evt.preventDefault();
+
+  const cur = texts.find((t) => t.id === selectedTextId);
+  if (!cur) return;
+
+  const dir = evt.deltaY > 0 ? -1 : 1; // wheel down -> smaller? 好みで逆でもOK
+  const next = Math.max(10, Math.min(80, Math.round(cur.fontSize + dir * 2)));
+
+  updateText(selectedTextId, { fontSize: next });
+};
 
   const stageRef = useRef<Konva.Stage | null>(null);
   const boardRef = useRef<Konva.Group | null>(null);
@@ -180,15 +246,12 @@ const Board2D = forwardRef<Board2DHandle>(function Board2D(_props, ref) {
         const st = stageRef.current;
         if (!st) return null;
 
-        // Konvaの実体は st.content (HTMLDivElement) の中に canvas が複数あることがある
-        // 基本的に一番上の「scene canvas」を使う（録画に最適）
         const container = st.content as unknown as HTMLDivElement | null;
         if (!container) return null;
 
         const canvases = Array.from(container.querySelectorAll("canvas"));
         if (canvases.length <= 0) return null;
 
-        // だいたい先頭が描画本体
         return canvases[0] as HTMLCanvasElement;
       },
     }),
@@ -263,17 +326,45 @@ const Board2D = forwardRef<Board2DHandle>(function Board2D(_props, ref) {
     return transform.point(pos);
   };
 
+  const isInsideRinkLocal = (local: { x: number; y: number }) => {
+    return !(local.x < 0 || local.y < 0 || local.x > rinkW || local.y > rinkH);
+  };
+
   const handleMouseDown = (e: any) => {
+    // パン優先
     if (!isMobile && spacePressed) {
       handlePanStart(e);
       return;
     }
-    if (!penEnabled) return;
 
     const stage = e.target.getStage() as Konva.Stage;
     const local = getLocalFromStage(stage);
     if (!local) return;
-    if (local.x < 0 || local.y < 0 || local.x > rinkW || local.y > rinkH) return;
+    if (!isInsideRinkLocal(local)) return;
+
+    // ✅ Textツール：1回置いたら自動でSelectに戻す
+    if (activeTool === "text") {
+      const w = toWorld(local.x, local.y);
+
+      // まずは仮テキスト（後でダブルクリック編集）
+      const id = addText({
+        x: w.x,
+        y: w.y,
+        text: "Text",
+        color: textColor,
+        fontSize: textSize,
+        boxW: 220, // ✅初期幅
+      });
+
+      // 置いた直後に選択状態にして、ツールはSelectへ
+      selectText(id);
+      setTool("select");
+
+      return;
+    }
+
+    // ペン
+    if (!penEnabled) return;
 
     const w = toWorld(local.x, local.y);
     setCurrentLineWorld([w.x, w.y]);
@@ -289,7 +380,7 @@ const Board2D = forwardRef<Board2DHandle>(function Board2D(_props, ref) {
     const stage = e.target.getStage() as Konva.Stage;
     const local = getLocalFromStage(stage);
     if (!local) return;
-    if (local.x < 0 || local.y < 0 || local.x > rinkW || local.y > rinkH) return;
+    if (!isInsideRinkLocal(local)) return;
 
     const w = toWorld(local.x, local.y);
     setCurrentLineWorld((prev) => [...prev, w.x, w.y]);
@@ -375,7 +466,12 @@ const Board2D = forwardRef<Board2DHandle>(function Board2D(_props, ref) {
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
-      onClick={() => selectPlayer(null)}
+      onClick={() => {
+        // ✅ 空白クリックで選択解除
+        selectPlayer(null);
+        selectText(null);
+      }}
+      onWheel={handleWheel}
     >
       <Layer>
         {/* パン用グループ（モバイルでは常に固定） */}
@@ -475,6 +571,102 @@ const Board2D = forwardRef<Board2DHandle>(function Board2D(_props, ref) {
               />
             ))}
 
+            {/* ✅ テキスト（選択＆ダブルクリック編集） */}
+            {texts.map((t) => {
+              const p = toLocal(t.x, t.y);
+              const isSel = t.id === selectedTextId;
+
+              const widthPx = Math.max(60, Math.min(800, t.boxW ?? 220));
+              const handleSize = 12;
+
+              return (
+                <Group
+                  key={t.id}
+                  x={p.x}
+                  y={p.y}
+                  draggable={!spacePressed && activeTool === "select"}
+                  onDragEnd={(e) => {
+                    const lx = e.target.x();
+                    const ly = e.target.y();
+                    const w = toWorld(lx, ly);
+                    updateText(t.id, { x: w.x, y: w.y });
+                  }}
+                >
+                  <Text
+                    text={t.text}
+                    fontSize={t.fontSize}
+                    fill={t.color}
+                    wrap="word"
+                    width={widthPx}
+                    listening // 念のため明示
+                    onMouseDown={(e) => {
+                      // クリック開始でStage側に伝播させない（選択解除されるのを防ぐ）
+                      e.cancelBubble = true;
+                    }}
+                    // heightは指定しない（自動で伸びる＝長文でも切れない）
+                    onClick={(e) => {
+                      e.cancelBubble = true;
+                      selectText(t.id);
+                    }}
+                    onDblClick={(e) => {
+                      e.cancelBubble = true;
+                      selectText(t.id);
+
+                      const next = window.prompt("Edit text", t.text);
+                      if (next === null) return;
+                      const trimmed = next.trim();
+
+                      // 空なら削除
+                      if (trimmed.length === 0) {
+                        removeText(t.id);
+                        return;
+                      }
+
+                      updateText(t.id, { text: trimmed });
+                    }}
+                  />
+
+                  {/* 選択枠 + リサイズハンドル（右下） */}
+                  {isSel && (
+                    <>
+                      {/* 枠（高さはTextの自動計算に合わせたいので、だいたいの見た目でOKならこれで十分） */}
+                      <Rect
+                        x={-6}
+                        y={-6}
+                        width={widthPx + 12}
+                        height={Math.max(24, t.fontSize * 1.3) + 12} // ざっくり。完璧に合わせたいなら次段階で測定する
+                        stroke="#10b981"
+                        strokeWidth={2}
+                        cornerRadius={6}
+                        opacity={0.9}
+                        listening={false} // ✅追加：イベントを奪わない
+                      />
+
+                      {/* リサイズハンドル（右下をドラッグで幅変更） */}
+                      <Rect
+                        x={widthPx - handleSize / 2}
+                        y={Math.max(24, t.fontSize * 1.3) - handleSize / 2}
+                        width={handleSize}
+                        height={handleSize}
+                        fill="#10b981"
+                        cornerRadius={3}
+                        draggable
+                        onDragMove={(e) => {
+                          e.cancelBubble = true;
+                          const newW = Math.max(60, Math.min(800, e.target.x() + handleSize / 2));
+                          updateText(t.id, { boxW: newW });
+                        }}
+                        onDragEnd={(e) => {
+                          // ハンドル位置は次レンダーで戻るので何もしない
+                          e.cancelBubble = true;
+                        }}
+                      />
+                    </>
+                  )}
+                </Group>
+              );
+            })}
+
             {/* 完了している線 */}
             {lines.map((ln, i) => (
               <Line
@@ -554,4 +746,3 @@ const Board2D = forwardRef<Board2DHandle>(function Board2D(_props, ref) {
 });
 
 export default Board2D;
-

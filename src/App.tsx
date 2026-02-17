@@ -226,7 +226,7 @@ function Sidebar({ onOpenAnimation }: { onOpenAnimation: () => void }) {
         </button>
 
         <ToolButton id="arrow" label="Arrow" icon="➡️" disabled />
-        <ToolButton id="text" label="Text" icon="🅣" disabled />
+        <ToolButton id="text" label="Text" icon="🅣" />
       </div>
 
       <div className="border-t border-slate-700 pt-2 px-2 flex flex-col gap-2">
@@ -733,6 +733,7 @@ function ChapterPlayer({ playbackSpeed }: { playbackSpeed: PlaybackSpeed }) {
         ball: from.ball,
         boardRotation: from.boardRotation,
         lines: from.lines,
+        texts: from.texts ?? [],
       });
 
       await sleep(200);
@@ -780,6 +781,7 @@ function ChapterPlayer({ playbackSpeed }: { playbackSpeed: PlaybackSpeed }) {
         ball: to.ball,
         boardRotation: to.boardRotation,
         lines: to.lines,
+        texts: to.texts ?? [],
       });
 
       await sleep(300);
@@ -793,6 +795,7 @@ function ChapterPlayer({ playbackSpeed }: { playbackSpeed: PlaybackSpeed }) {
             ball: seq[0].ball,
             boardRotation: seq[0].boardRotation,
             lines: seq[0].lines,
+            texts: seq[0].texts ?? [],
           });
           await sleep(800);
           if (!cancelled) stopPlayChapters();
