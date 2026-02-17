@@ -95,12 +95,7 @@ function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
 }
 
-// テキスト枠（雑に見積もり：prompt版ならこれで十分）
-function estimateTextBoxPx(text: string, fontSize: number) {
-  const w = Math.max(20, text.length * fontSize * 0.55);
-  const h = Math.max(14, fontSize * 1.2);
-  return { w, h };
-}
+
 
 function PlayerToken({
   id,
