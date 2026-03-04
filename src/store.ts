@@ -85,6 +85,7 @@ export interface DrawText {
   color: string;
   fontSize: number; // world基準ではなく「見た目用」(px相当)
   boxW?: number;    // ✅追加：テキスト枠の幅(px)
+  boxH?: number; // ✅追加（縦リサイズ用）
 }
 
 type Tool = "select" | "pen" | "eraser" | "arrow" | "text";
@@ -222,6 +223,7 @@ export const useDrawStore = create<DrawState>((set, get) => ({
         color: t.color,
         fontSize: t.fontSize,
         boxW: t.boxW ?? 220, // ✅追加：デフォルト幅
+        boxH: (t as any).boxH ?? 60, // ✅追加（初期高さ）
       },
     ];
 
@@ -489,8 +491,9 @@ function sanitizeText(t: any): DrawText | null {
   const color = isStr(t.color) ? t.color : "#111827";
   const fontSize = isNum(t.fontSize) ? t.fontSize : 22;
   // ✅追加（後方互換）
-  const boxW = isNum((t as any).boxW) ? Number((t as any).boxW) : undefined;
-  return { id: t.id, x: t.x, y: t.y, text: t.text, color, fontSize, boxW  };
+  const boxW = isNum(t.boxW) ? t.boxW : undefined;
+  const boxH = isNum(t.boxH) ? t.boxH : undefined;
+  return { id: t.id, x: t.x, y: t.y, text: t.text, color, fontSize, boxW, boxH };
 }
 function sanitizeChapter(c: any): ChapterSnapshot | null {
   if (!isObj(c)) return null;

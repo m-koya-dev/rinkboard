@@ -4,7 +4,7 @@ import {
   useEffect,
   useImperativeHandle,
   useRef,
-  useState, // ✅追加
+  useState,
 } from "react";
 import { Stage, Layer, Rect, Line, Circle, Group, Text } from "react-konva";
 import type Konva from "konva";
@@ -46,7 +46,7 @@ function useLayout() {
   const stageW = size.w;
   const stageH = size.h - toolbarH;
 
-  // PCは余白あり、モバイルは余白ゼロ（あなたの現行方針）
+  // PCは余白あり、モバイルは余白ゼロ
   const pad = isMobile ? 0 : 40;
   const scale = Math.min(
     (stageW - pad * 2) / worldW,
@@ -94,8 +94,6 @@ function makeConverters(worldW: number, worldH: number, scale: number) {
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
 }
-
-
 
 function PlayerToken({
   id,
@@ -145,7 +143,12 @@ function PlayerToken({
           opacity={0.9}
         />
       )}
-      <Circle radius={tokenRadius} fill={color} stroke="#0f172a" strokeWidth={2} />
+      <Circle
+        radius={tokenRadius}
+        fill={color}
+        stroke="#0f172a"
+        strokeWidth={2}
+      />
       {/* 背番号はボード回転に対して常に読みやすい向きに固定 */}
       <Group rotation={-boardRotation * 90}>
         <Text
@@ -162,9 +165,20 @@ function PlayerToken({
 }
 
 const Board2D = forwardRef<Board2DHandle>(function Board2D(_props, ref) {
-  const { players, selectPlayer, ball, updateBall, boardRotation } = useBoardStore();
-  const { stageW, stageH, scale, worldW, worldH, rinkW, rinkH, centerX, centerY, isMobile } =
-    useLayout();
+  const { players, selectPlayer, ball, updateBall, boardRotation } =
+    useBoardStore();
+  const {
+    stageW,
+    stageH,
+    scale,
+    worldW,
+    worldH,
+    rinkW,
+    rinkH,
+    centerX,
+    centerY,
+    isMobile,
+  } = useLayout();
 
   const { toLocal, toWorld } = makeConverters(worldW, worldH, scale);
 
@@ -192,43 +206,55 @@ const Board2D = forwardRef<Board2DHandle>(function Board2D(_props, ref) {
     setTool,
   } = useDrawStore();
 
+  // ===== Text helpers =====
+
+  // wrap後の「実測高さ(px)」を保持（ID => height）
+  const textHeightsRef = useRef<Record<string, number>>({});
+  const [, forceRerender] = useState(0);
+
+  // リサイズ中はGroupのdragを止める
+  const [resizingTextId, setResizingTextId] = useState<string | null>(null);
+
   // ✅ 選択テキスト削除（Delete / Backspace）+ Escで解除
-useEffect(() => {
-  const onKeyDown = (e: KeyboardEvent) => {
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!selectedTextId) return;
+
+      if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        removeText(selectedTextId);
+        return;
+      }
+      if (e.key === "Escape") {
+        selectText(null);
+        return;
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [selectedTextId, removeText, selectText]);
+
+  // ✅ Ctrl + Wheel で文字サイズ調整（選択中のみ）
+  const handleWheel = (e: any) => {
     if (!selectedTextId) return;
 
-    if (e.key === "Delete" || e.key === "Backspace") {
-      e.preventDefault();
-      removeText(selectedTextId);
-      return;
-    }
-    if (e.key === "Escape") {
-      selectText(null);
-      return;
-    }
+    const evt = e.evt as WheelEvent;
+    if (!evt.ctrlKey) return;
+
+    evt.preventDefault();
+
+    const cur = texts.find((t: any) => t.id === selectedTextId);
+    if (!cur) return;
+
+    const dir = evt.deltaY > 0 ? -1 : 1;
+    const next = Math.max(
+      10,
+      Math.min(80, Math.round((cur.fontSize ?? 22) + dir * 2))
+    );
+
+    updateText(selectedTextId, { fontSize: next });
   };
-
-  window.addEventListener("keydown", onKeyDown);
-  return () => window.removeEventListener("keydown", onKeyDown);
-}, [selectedTextId, removeText, selectText]);
-
-// ✅ Ctrl + Wheel で文字サイズ調整（選択中のみ）
-const handleWheel = (e: any) => {
-  if (!selectedTextId) return;
-
-  const evt = e.evt as WheelEvent;
-  if (!evt.ctrlKey) return;
-
-  evt.preventDefault();
-
-  const cur = texts.find((t) => t.id === selectedTextId);
-  if (!cur) return;
-
-  const dir = evt.deltaY > 0 ? -1 : 1; // wheel down -> smaller? 好みで逆でもOK
-  const next = Math.max(10, Math.min(80, Math.round(cur.fontSize + dir * 2)));
-
-  updateText(selectedTextId, { fontSize: next });
-};
 
   const stageRef = useRef<Konva.Stage | null>(null);
   const boardRef = useRef<Konva.Group | null>(null);
@@ -341,20 +367,18 @@ const handleWheel = (e: any) => {
     if (activeTool === "text") {
       const w = toWorld(local.x, local.y);
 
-      // まずは仮テキスト（後でダブルクリック編集）
       const id = addText({
         x: w.x,
         y: w.y,
         text: "Text",
         color: textColor,
         fontSize: textSize,
-        boxW: 220, // ✅初期幅
+        boxW: 220,
+        boxH: 60,
       });
 
-      // 置いた直後に選択状態にして、ツールはSelectへ
       selectText(id);
       setTool("select");
-
       return;
     }
 
@@ -420,8 +444,14 @@ const handleWheel = (e: any) => {
   const penaltyHeightPx = 6 * scale;
   const penaltyWidthPx = (penaltyFrontXLeft - penaltyBackXLeft) * scale;
 
-  const penaltyCenterLeftPx = toLocal((penaltyBackXLeft + penaltyFrontXLeft) / 2, 0);
-  const penaltyCenterRightPx = toLocal((penaltyBackXRight + penaltyFrontXRight) / 2, 0);
+  const penaltyCenterLeftPx = toLocal(
+    (penaltyBackXLeft + penaltyFrontXLeft) / 2,
+    0
+  );
+  const penaltyCenterRightPx = toLocal(
+    (penaltyBackXRight + penaltyFrontXRight) / 2,
+    0
+  );
 
   const pkLeftPx = toLocal(penaltyFrontXLeft, 0);
   const pkRightPx = toLocal(penaltyFrontXRight, 0);
@@ -566,12 +596,23 @@ const handleWheel = (e: any) => {
               />
             ))}
 
-            {/* ✅ テキスト（選択＆ダブルクリック編集） */}
-            {texts.map((t) => {
+            {/* ✅ テキスト（移動/選択/編集/縦横リサイズ/長文対応） */}
+            {texts.map((t: any) => {
               const p = toLocal(t.x, t.y);
               const isSel = t.id === selectedTextId;
 
-              const widthPx = Math.max(60, Math.min(800, t.boxW ?? 220));
+              const minW = 80;
+              const maxW = 900;
+              const minH = 30;
+              const maxH = 500;
+
+              const widthPx = Math.max(minW, Math.min(maxW, t.boxW ?? 220));
+              const measuredH = textHeightsRef.current[t.id] ?? (t.boxH ?? 60);
+              const heightPx = Math.max(
+                minH,
+                Math.min(maxH, Math.max(t.boxH ?? 60, measuredH))
+              );
+
               const handleSize = 12;
 
               return (
@@ -579,8 +620,22 @@ const handleWheel = (e: any) => {
                   key={t.id}
                   x={p.x}
                   y={p.y}
-                  draggable={!spacePressed && activeTool === "select"}
+                  draggable={!spacePressed && activeTool === "select" && resizingTextId !== t.id}
+                  // ✅ ここが重要：Group側でイベントを止めて選択する（Stageの選択解除を防ぐ）
+                  onMouseDown={(e) => {
+                    e.cancelBubble = true;
+                    selectText(t.id);
+                  }}
+                  onClick={(e) => {
+                    e.cancelBubble = true;
+                    selectText(t.id);
+                  }}
+                  onDragStart={(e) => {
+                    e.cancelBubble = true;
+                    selectText(t.id);
+                  }}
                   onDragEnd={(e) => {
+                    e.cancelBubble = true;
                     const lx = e.target.x();
                     const ly = e.target.y();
                     const w = toWorld(lx, ly);
@@ -591,18 +646,11 @@ const handleWheel = (e: any) => {
                     text={t.text}
                     fontSize={t.fontSize}
                     fill={t.color}
-                    wrap="word"
                     width={widthPx}
-                    listening // 念のため明示
-                    onMouseDown={(e) => {
-                      // クリック開始でStage側に伝播させない（選択解除されるのを防ぐ）
-                      e.cancelBubble = true;
-                    }}
-                    // heightは指定しない（自動で伸びる＝長文でも切れない）
-                    onClick={(e) => {
-                      e.cancelBubble = true;
-                      selectText(t.id);
-                    }}
+                    wrap="word"
+                    padding={6}
+                    listening
+                    // ✅ 重要：ここで cancelBubble しない（ドラッグ開始を邪魔しない）
                     onDblClick={(e) => {
                       e.cancelBubble = true;
                       selectText(t.id);
@@ -611,7 +659,6 @@ const handleWheel = (e: any) => {
                       if (next === null) return;
                       const trimmed = next.trim();
 
-                      // 空なら削除
                       if (trimmed.length === 0) {
                         removeText(t.id);
                         return;
@@ -619,41 +666,71 @@ const handleWheel = (e: any) => {
 
                       updateText(t.id, { text: trimmed });
                     }}
+                    ref={(node) => {
+                      if (!node) return;
+
+                      const h = node.height();
+                      const prev = textHeightsRef.current[t.id];
+                      if (prev !== h) {
+                        textHeightsRef.current[t.id] = h;
+
+                        // 実測高さの方が大きいなら boxH を押し上げ（見切れ防止）
+                        const curBoxH = t.boxH ?? 60;
+                        if (h > curBoxH + 1) {
+                          updateText(t.id, { boxH: Math.min(maxH, Math.ceil(h)) });
+                        }
+
+                        // 枠/ハンドル位置の更新用
+                        forceRerender((x) => x + 1);
+                      }
+                    }}
                   />
 
-                  {/* 選択枠 + リサイズハンドル（右下） */}
                   {isSel && (
                     <>
-                      {/* 枠（高さはTextの自動計算に合わせたいので、だいたいの見た目でOKならこれで十分） */}
+                      {/* 枠 */}
                       <Rect
-                        x={-6}
-                        y={-6}
-                        width={widthPx + 12}
-                        height={Math.max(24, t.fontSize * 1.3) + 12} // ざっくり。完璧に合わせたいなら次段階で測定する
+                        x={0}
+                        y={0}
+                        width={widthPx}
+                        height={heightPx}
                         stroke="#10b981"
                         strokeWidth={2}
                         cornerRadius={6}
                         opacity={0.9}
-                        listening={false} // ✅追加：イベントを奪わない
+                        listening={false}
                       />
 
-                      {/* リサイズハンドル（右下をドラッグで幅変更） */}
+                      {/* 右下ハンドル（縦横リサイズ） */}
                       <Rect
-                        x={widthPx - handleSize / 2}
-                        y={Math.max(24, t.fontSize * 1.3) - handleSize / 2}
+                        x={widthPx - handleSize}
+                        y={heightPx - handleSize}
                         width={handleSize}
                         height={handleSize}
                         fill="#10b981"
                         cornerRadius={3}
                         draggable
+                        onDragStart={(e) => {
+                          e.cancelBubble = true;
+                          setResizingTextId(t.id);
+                        }}
                         onDragMove={(e) => {
                           e.cancelBubble = true;
-                          const newW = Math.max(60, Math.min(800, e.target.x() + handleSize / 2));
-                          updateText(t.id, { boxW: newW });
+
+                          const nx = e.target.x() + handleSize; // 新しい幅
+                          const ny = e.target.y() + handleSize; // 新しい高さ
+
+                          const newW = Math.max(minW, Math.min(maxW, nx));
+                          const newH = Math.max(minH, Math.min(maxH, ny));
+
+                          updateText(t.id, { boxW: newW, boxH: newH });
                         }}
                         onDragEnd={(e) => {
-                          // ハンドル位置は次レンダーで戻るので何もしない
                           e.cancelBubble = true;
+                          setResizingTextId(null);
+
+                          // ハンドル自身は次描画で戻るが、念のため
+                          e.target.position({ x: widthPx - handleSize, y: heightPx - handleSize });
                         }}
                       />
                     </>
@@ -663,10 +740,10 @@ const handleWheel = (e: any) => {
             })}
 
             {/* 完了している線 */}
-            {lines.map((ln, i) => (
+            {lines.map((ln: any, i: number) => (
               <Line
                 key={i}
-                points={ln.points.flatMap((_, idx) =>
+                points={ln.points.flatMap((_: any, idx: number) =>
                   idx % 2 === 0
                     ? toLocal(ln.points[idx], ln.points[idx + 1]).x
                     : toLocal(ln.points[idx - 1], ln.points[idx]).y
@@ -687,7 +764,7 @@ const handleWheel = (e: any) => {
             {/* 描き途中の線 */}
             {currentLineWorld.length > 0 && (
               <Line
-                points={currentLineWorld.flatMap((_, idx) =>
+                points={currentLineWorld.flatMap((_: any, idx: number) =>
                   idx % 2 === 0
                     ? toLocal(currentLineWorld[idx], currentLineWorld[idx + 1]).x
                     : toLocal(currentLineWorld[idx - 1], currentLineWorld[idx]).y
@@ -721,7 +798,7 @@ const handleWheel = (e: any) => {
             </Group>
 
             {/* プレイヤー */}
-            {players.map((p) => (
+            {players.map((p: any) => (
               <PlayerToken
                 key={p.id}
                 {...p}
