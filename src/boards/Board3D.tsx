@@ -5,6 +5,10 @@ import { useRef, useState } from "react";
 import * as THREE from "three";
 import { BOUNDS, useBoardStore } from "../store";
 
+type Board3DProps = {
+  readOnly?: boolean;
+};
+
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
 }
@@ -86,27 +90,18 @@ function RinkFloor() {
         <planeGeometry args={[penaltyWidth, penaltyHeight]} />
         <meshStandardMaterial color={goalAreaColor} />
       </mesh>
-      <mesh
-        rotation-x={-Math.PI / 2}
-        position={[penaltyCenterRight, 0.025, 0]}
-      >
+      <mesh rotation-x={-Math.PI / 2} position={[penaltyCenterRight, 0.025, 0]}>
         <planeGeometry args={[penaltyWidth, penaltyHeight]} />
         <meshStandardMaterial color={goalAreaColor} />
       </mesh>
 
       {/* ペナルティ枠（四辺を細い box で描く） */}
       {/* 左側 */}
-      <mesh
-        rotation-x={-Math.PI / 2}
-        position={[penaltyCenterLeft, 0.03, penaltyHalfH]}
-      >
+      <mesh rotation-x={-Math.PI / 2} position={[penaltyCenterLeft, 0.03, penaltyHalfH]}>
         <boxGeometry args={[penaltyWidth, 0.05, 0.01]} />
         <meshStandardMaterial color={lineColor} />
       </mesh>
-      <mesh
-        rotation-x={-Math.PI / 2}
-        position={[penaltyCenterLeft, 0.03, -penaltyHalfH]}
-      >
+      <mesh rotation-x={-Math.PI / 2} position={[penaltyCenterLeft, 0.03, -penaltyHalfH]}>
         <boxGeometry args={[penaltyWidth, 0.05, 0.01]} />
         <meshStandardMaterial color={lineColor} />
       </mesh>
@@ -120,17 +115,11 @@ function RinkFloor() {
       </mesh>
 
       {/* 右側 */}
-      <mesh
-        rotation-x={-Math.PI / 2}
-        position={[penaltyCenterRight, 0.03, penaltyHalfH]}
-      >
+      <mesh rotation-x={-Math.PI / 2} position={[penaltyCenterRight, 0.03, penaltyHalfH]}>
         <boxGeometry args={[penaltyWidth, 0.05, 0.01]} />
         <meshStandardMaterial color={lineColor} />
       </mesh>
-      <mesh
-        rotation-x={-Math.PI / 2}
-        position={[penaltyCenterRight, 0.03, -penaltyHalfH]}
-      >
+      <mesh rotation-x={-Math.PI / 2} position={[penaltyCenterRight, 0.03, -penaltyHalfH]}>
         <boxGeometry args={[penaltyWidth, 0.05, 0.01]} />
         <meshStandardMaterial color={lineColor} />
       </mesh>
@@ -148,11 +137,7 @@ function RinkFloor() {
         [-6, 0],
         [6, 0],
       ].map(([x, z], i) => (
-        <mesh
-          key={`front-dot-${i}`}
-          rotation-x={-Math.PI / 2}
-          position={[x, 0.04, z]}
-        >
+        <mesh key={`front-dot-${i}`} rotation-x={-Math.PI / 2} position={[x, 0.04, z]}>
           <ringGeometry args={[0.09, 0.13, 24]} />
           <meshStandardMaterial color={lineColor} side={THREE.DoubleSide} />
         </mesh>
@@ -163,11 +148,7 @@ function RinkFloor() {
         [penaltyFrontXLeft, 0],
         [penaltyFrontXRight, 0],
       ].map(([x, z], i) => (
-        <mesh
-          key={`pk-${i}`}
-          rotation-x={-Math.PI / 2}
-          position={[x, 0.04, z]}
-        >
+        <mesh key={`pk-${i}`} rotation-x={-Math.PI / 2} position={[x, 0.04, z]}>
           <ringGeometry args={[0.12, 0.18, 24]} />
           <meshStandardMaterial color={lineColor} side={THREE.DoubleSide} />
         </mesh>
@@ -207,23 +188,17 @@ function Goal3D({ side, x }: { side: "left" | "right"; x: number }) {
 
       {/* クロスバー（前：リンク側） */}
       <mesh position={[frontX, height, 0]}>
-        <boxGeometry
-          args={[postThickness, postThickness, width + postThickness]}
-        />
+        <boxGeometry args={[postThickness, postThickness, width + postThickness]} />
         <meshStandardMaterial color={frameColor} />
       </mesh>
 
       {/* サイドバー（奥行き） */}
       <mesh position={[(frontX + backX) / 2, height / 2, width / 2]}>
-        <boxGeometry
-          args={[Math.abs(backX - frontX), postThickness, postThickness]}
-        />
+        <boxGeometry args={[Math.abs(backX - frontX), postThickness, postThickness]} />
         <meshStandardMaterial color={frameColor} />
       </mesh>
       <mesh position={[(frontX + backX) / 2, height / 2, -width / 2]}>
-        <boxGeometry
-          args={[Math.abs(backX - frontX), postThickness, postThickness]}
-        />
+        <boxGeometry args={[Math.abs(backX - frontX), postThickness, postThickness]} />
         <meshStandardMaterial color={frameColor} />
       </mesh>
 
@@ -243,14 +218,16 @@ function Goal3D({ side, x }: { side: "left" | "right"; x: number }) {
 const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); // y=0 平面
 const intersection = new THREE.Vector3();
 
-function Player3D({ id, x, y, color, number }: any) {
+function Player3D({ id, x, y, color, number, readOnly }: any) {
   const groupRef = useRef<any>(null);
   const [dragging, setDragging] = useState(false);
   const { selectedId, selectPlayer, updatePlayer, mode3D } = useBoardStore();
   const selected = selectedId === id;
 
   const handlePointerDown = (e: any) => {
+    if (readOnly) return;
     if (mode3D !== "piece") return;
+
     e.stopPropagation();
     setDragging(true);
     selectPlayer(id);
@@ -258,7 +235,9 @@ function Player3D({ id, x, y, color, number }: any) {
   };
 
   const handlePointerUp = (e: any) => {
+    if (readOnly) return;
     if (!dragging) return;
+
     e.stopPropagation();
     setDragging(false);
     e.target.releasePointerCapture?.(e.pointerId);
@@ -272,7 +251,9 @@ function Player3D({ id, x, y, color, number }: any) {
   };
 
   const handlePointerMove = (e: any) => {
+    if (readOnly) return;
     if (!dragging || mode3D !== "piece") return;
+
     e.stopPropagation();
     if (!groupRef.current) return;
 
@@ -297,11 +278,13 @@ function Player3D({ id, x, y, color, number }: any) {
           <meshBasicMaterial color={"#10b981"} transparent opacity={0.9} />
         </mesh>
       )}
+
       <mesh
         castShadow
         onClick={(e) => {
           e.stopPropagation();
-          if (mode3D !== "piece") {
+          // view only でも選択はOK（＝閲覧操作）
+          if (mode3D !== "piece" || readOnly) {
             selectPlayer(selected ? null : id);
           }
         }}
@@ -309,6 +292,7 @@ function Player3D({ id, x, y, color, number }: any) {
         <cylinderGeometry args={[0.3, 0.3, 1, 24]} />
         <meshStandardMaterial color={color} />
       </mesh>
+
       <Text
         position={[0, 0.9, 0]}
         fontSize={0.45}
@@ -328,20 +312,24 @@ function Player3D({ id, x, y, color, number }: any) {
 
 const ballPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
-function Ball3D() {
+function Ball3D({ readOnly }: { readOnly: boolean }) {
   const groupRef = useRef<any>(null);
   const [dragging, setDragging] = useState(false);
   const { ball, updateBall, mode3D } = useBoardStore();
 
   const handlePointerDown = (e: any) => {
+    if (readOnly) return;
     if (mode3D !== "piece") return;
+
     e.stopPropagation();
     setDragging(true);
     e.target.setPointerCapture?.(e.pointerId);
   };
 
   const handlePointerUp = (e: any) => {
+    if (readOnly) return;
     if (!dragging) return;
+
     e.stopPropagation();
     setDragging(false);
     e.target.releasePointerCapture?.(e.pointerId);
@@ -355,7 +343,9 @@ function Ball3D() {
   };
 
   const handlePointerMove = (e: any) => {
+    if (readOnly) return;
     if (!dragging || mode3D !== "piece") return;
+
     e.stopPropagation();
     if (!groupRef.current) return;
 
@@ -385,7 +375,7 @@ function Ball3D() {
 /* ============================
         メイン 3D ボード
  ============================ */
-export default function Board3D() {
+export default function Board3D({ readOnly = false }: Board3DProps) {
   const { players, selectPlayer, mode3D } = useBoardStore();
   const onMiss = () => selectPlayer(null);
 
@@ -408,7 +398,7 @@ export default function Board3D() {
       <PerspectiveCamera makeDefault position={[12, 10, 12]} />
 
       <OrbitControls
-        enabled={mode3D === "camera"}
+        enabled={mode3D === "camera"} // view only でも camera モードはOK
         enablePan
         enableRotate
         enableZoom
@@ -427,12 +417,11 @@ export default function Board3D() {
 
       {/* プレイヤー */}
       {players.map((p) => (
-        <Player3D key={p.id} {...p} />
+        <Player3D key={p.id} {...p} readOnly={readOnly} />
       ))}
 
       {/* ボール */}
-      <Ball3D />
+      <Ball3D readOnly={readOnly} />
     </Canvas>
   );
 }
-

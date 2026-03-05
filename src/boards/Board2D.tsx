@@ -17,6 +17,10 @@ export type Board2DHandle = {
   getCaptureCanvas: () => HTMLCanvasElement | null;
 };
 
+type Board2DProps = {
+  readOnly?: boolean;
+};
+
 /**
  * レイアウト計算
  */
@@ -107,6 +111,7 @@ function PlayerToken({
   spacePressed,
   tokenRadius,
   fontSize,
+  readOnly,
 }: any) {
   const { selectedId, selectPlayer, updatePlayer } = useBoardStore();
   const sel = selectedId === id;
@@ -116,8 +121,10 @@ function PlayerToken({
     <Group
       x={lp.x}
       y={lp.y}
-      draggable={!spacePressed}
+      draggable={!readOnly && !spacePressed}
       onDragEnd={(e) => {
+        if (readOnly) return;
+
         const lx = e.target.x();
         const ly = e.target.y();
 
@@ -143,12 +150,7 @@ function PlayerToken({
           opacity={0.9}
         />
       )}
-      <Circle
-        radius={tokenRadius}
-        fill={color}
-        stroke="#0f172a"
-        strokeWidth={2}
-      />
+      <Circle radius={tokenRadius} fill={color} stroke="#0f172a" strokeWidth={2} />
       {/* 背番号はボード回転に対して常に読みやすい向きに固定 */}
       <Group rotation={-boardRotation * 90}>
         <Text
@@ -164,7 +166,12 @@ function PlayerToken({
   );
 }
 
-const Board2D = forwardRef<Board2DHandle>(function Board2D(_props, ref) {
+const Board2D = forwardRef<Board2DHandle, Board2DProps>(function Board2D(
+  props,
+  ref
+) {
+  const readOnly = !!props.readOnly;
+
   const { players, selectPlayer, ball, updateBall, boardRotation } =
     useBoardStore();
   const {
@@ -220,24 +227,29 @@ const Board2D = forwardRef<Board2DHandle>(function Board2D(_props, ref) {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!selectedTextId) return;
 
+      if (e.key === "Escape") {
+        selectText(null);
+        return;
+      }
+
+      // view only は削除禁止
+      if (readOnly) return;
+
       if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault();
         removeText(selectedTextId);
-        return;
-      }
-      if (e.key === "Escape") {
-        selectText(null);
         return;
       }
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [selectedTextId, removeText, selectText]);
+  }, [selectedTextId, removeText, selectText, readOnly]);
 
   // ✅ Ctrl + Wheel で文字サイズ調整（選択中のみ）
   const handleWheel = (e: any) => {
     if (!selectedTextId) return;
+    if (readOnly) return;
 
     const evt = e.evt as WheelEvent;
     if (!evt.ctrlKey) return;
@@ -352,7 +364,7 @@ const Board2D = forwardRef<Board2DHandle>(function Board2D(_props, ref) {
   };
 
   const handleMouseDown = (e: any) => {
-    // パン優先
+    // パン優先（view only でもOK）
     if (!isMobile && spacePressed) {
       handlePanStart(e);
       return;
@@ -363,8 +375,10 @@ const Board2D = forwardRef<Board2DHandle>(function Board2D(_props, ref) {
     if (!local) return;
     if (!isInsideRinkLocal(local)) return;
 
-    // ✅ Textツール：1回置いたら自動でSelectに戻す
+    // ✅ Textツール：1回置いたら自動でSelectに戻す（view only は追加禁止）
     if (activeTool === "text") {
+      if (readOnly) return;
+
       const w = toWorld(local.x, local.y);
 
       const id = addText({
@@ -382,7 +396,8 @@ const Board2D = forwardRef<Board2DHandle>(function Board2D(_props, ref) {
       return;
     }
 
-    // ペン
+    // ペン（view only は描画禁止）
+    if (readOnly) return;
     if (!penEnabled) return;
 
     const w = toWorld(local.x, local.y);
@@ -394,6 +409,7 @@ const Board2D = forwardRef<Board2DHandle>(function Board2D(_props, ref) {
       handlePanMove(e);
       return;
     }
+    if (readOnly) return;
     if (!penEnabled || currentLineWorld.length === 0) return;
 
     const stage = e.target.getStage() as Konva.Stage;
@@ -408,6 +424,11 @@ const Board2D = forwardRef<Board2DHandle>(function Board2D(_props, ref) {
   const handleMouseUp = () => {
     if (!isMobile && spacePressed) {
       handlePanEnd();
+      return;
+    }
+
+    if (readOnly) {
+      setCurrentLineWorld([]);
       return;
     }
 
@@ -492,7 +513,7 @@ const Board2D = forwardRef<Board2DHandle>(function Board2D(_props, ref) {
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onClick={() => {
-        // ✅ 空白クリックで選択解除
+        // ✅ 空白クリックで選択解除（閲覧でもOK）
         selectPlayer(null);
         selectText(null);
       }}
@@ -620,7 +641,12 @@ const Board2D = forwardRef<Board2DHandle>(function Board2D(_props, ref) {
                   key={t.id}
                   x={p.x}
                   y={p.y}
-                  draggable={!spacePressed && activeTool === "select" && resizingTextId !== t.id}
+                  draggable={
+                    !readOnly &&
+                    !spacePressed &&
+                    activeTool === "select" &&
+                    resizingTextId !== t.id
+                  }
                   // ✅ ここが重要：Group側でイベントを止めて選択する（Stageの選択解除を防ぐ）
                   onMouseDown={(e) => {
                     e.cancelBubble = true;
@@ -635,6 +661,8 @@ const Board2D = forwardRef<Board2DHandle>(function Board2D(_props, ref) {
                     selectText(t.id);
                   }}
                   onDragEnd={(e) => {
+                    if (readOnly) return;
+
                     e.cancelBubble = true;
                     const lx = e.target.x();
                     const ly = e.target.y();
@@ -650,8 +678,10 @@ const Board2D = forwardRef<Board2DHandle>(function Board2D(_props, ref) {
                     wrap="word"
                     padding={6}
                     listening
-                    // ✅ 重要：ここで cancelBubble しない（ドラッグ開始を邪魔しない）
                     onDblClick={(e) => {
+                      // view only は編集禁止
+                      if (readOnly) return;
+
                       e.cancelBubble = true;
                       selectText(t.id);
 
@@ -675,9 +705,11 @@ const Board2D = forwardRef<Board2DHandle>(function Board2D(_props, ref) {
                         textHeightsRef.current[t.id] = h;
 
                         // 実測高さの方が大きいなら boxH を押し上げ（見切れ防止）
-                        const curBoxH = t.boxH ?? 60;
-                        if (h > curBoxH + 1) {
-                          updateText(t.id, { boxH: Math.min(maxH, Math.ceil(h)) });
+                        if (!readOnly) {
+                          const curBoxH = t.boxH ?? 60;
+                          if (h > curBoxH + 1) {
+                            updateText(t.id, { boxH: Math.min(maxH, Math.ceil(h)) });
+                          }
                         }
 
                         // 枠/ハンドル位置の更新用
@@ -709,12 +741,16 @@ const Board2D = forwardRef<Board2DHandle>(function Board2D(_props, ref) {
                         height={handleSize}
                         fill="#10b981"
                         cornerRadius={3}
-                        draggable
+                        draggable={!readOnly}
                         onDragStart={(e) => {
+                          if (readOnly) return;
+
                           e.cancelBubble = true;
                           setResizingTextId(t.id);
                         }}
                         onDragMove={(e) => {
+                          if (readOnly) return;
+
                           e.cancelBubble = true;
 
                           const nx = e.target.x() + handleSize; // 新しい幅
@@ -726,6 +762,8 @@ const Board2D = forwardRef<Board2DHandle>(function Board2D(_props, ref) {
                           updateText(t.id, { boxW: newW, boxH: newH });
                         }}
                         onDragEnd={(e) => {
+                          if (readOnly) return;
+
                           e.cancelBubble = true;
                           setResizingTextId(null);
 
@@ -754,7 +792,9 @@ const Board2D = forwardRef<Board2DHandle>(function Board2D(_props, ref) {
                 lineJoin="round"
                 hitStrokeWidth={ln.width + 8}
                 onClick={(e) => {
+                  if (readOnly) return;
                   if (!eraserEnabled) return;
+
                   e.cancelBubble = true;
                   eraseLine(i);
                 }}
@@ -762,7 +802,7 @@ const Board2D = forwardRef<Board2DHandle>(function Board2D(_props, ref) {
             ))}
 
             {/* 描き途中の線 */}
-            {currentLineWorld.length > 0 && (
+            {!readOnly && currentLineWorld.length > 0 && (
               <Line
                 points={currentLineWorld.flatMap((_: any, idx: number) =>
                   idx % 2 === 0
@@ -780,8 +820,10 @@ const Board2D = forwardRef<Board2DHandle>(function Board2D(_props, ref) {
             <Group
               x={ballLocal.x}
               y={ballLocal.y}
-              draggable={!spacePressed}
+              draggable={!readOnly && !spacePressed}
               onDragEnd={(e) => {
+                if (readOnly) return;
+
                 const lx = e.target.x();
                 const ly = e.target.y();
                 const w = toWorld(lx, ly);
@@ -808,6 +850,7 @@ const Board2D = forwardRef<Board2DHandle>(function Board2D(_props, ref) {
                 spacePressed={spacePressed}
                 tokenRadius={tokenRadius}
                 fontSize={tokenFontSize}
+                readOnly={readOnly}
               />
             ))}
           </Group>

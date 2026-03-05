@@ -68,6 +68,7 @@ function Header({
   onOpenPlayers,
   lang,
   toggleLang,
+  readOnly,
 }: {
   viewMode: ViewMode;
   setViewMode: (v: ViewMode) => void;
@@ -77,6 +78,7 @@ function Header({
   onOpenPlayers: () => void;
   lang: "ja" | "en";
   toggleLang: () => void;
+  readOnly: boolean;
 }) {
   const { rotateBoard, resetPositions } = useBoardStore();
   const { undo, redo, clearAllLines } = useDrawStore();
@@ -88,10 +90,11 @@ function Header({
   const buttonBase =
     "inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium border border-white/15 text-slate-100 hover:bg-white/10 transition";
 
+  const disabledBtn = buttonBase + " opacity-50 cursor-not-allowed pointer-events-none";
+
   const mode3DBase = "px-2 py-0.5 rounded-full text-[11px] border transition";
   const mode3DActive = mode3DBase + " bg-sky-500 text-white border-sky-400";
-  const mode3DInactive =
-    mode3DBase + " bg-white/5 text-slate-100 border-white/10 hover:bg-white/10";
+  const mode3DInactive = mode3DBase + " bg-white/5 text-slate-100 border-white/10 hover:bg-white/10";
 
   return (
     <header className="flex items-center justify-between px-4 py-1 bg-slate-900/95 border-b border-slate-800">
@@ -104,6 +107,12 @@ function Header({
           <span className="text-sm font-semibold text-slate-50">RinkBoard</span>
           <span className="text-[11px] text-slate-400">{t(lang, "header.subtitle")}</span>
         </div>
+
+        {readOnly && (
+          <span className="ml-2 px-2 py-0.5 rounded-full text-[11px] bg-white/10 border border-white/10 text-slate-200">
+            View only
+          </span>
+        )}
       </div>
 
       {/* 中央：ビュー切り替え + 3D操作モード */}
@@ -137,31 +146,38 @@ function Header({
           {t(lang, "header.btn.animation")}
         </button>
 
-        <button className={buttonBase} onClick={undo}>
+        <button className={readOnly ? disabledBtn : buttonBase} onClick={undo} title={readOnly ? "View only" : ""}>
           {t(lang, "header.btn.undo")}
         </button>
-        <button className={buttonBase} onClick={redo}>
+        <button className={readOnly ? disabledBtn : buttonBase} onClick={redo} title={readOnly ? "View only" : ""}>
           {t(lang, "header.btn.redo")}
         </button>
-        <button className={buttonBase} onClick={rotateBoard}>
+
+        <button className={readOnly ? disabledBtn : buttonBase} onClick={rotateBoard} title={readOnly ? "View only" : ""}>
           {t(lang, "header.btn.rotate")}
         </button>
+
         <button
-          className={buttonBase}
+          className={readOnly ? disabledBtn : buttonBase}
           onClick={() => {
             clearAllLines();
             resetPositions();
           }}
+          title={readOnly ? "View only" : ""}
         >
           {t(lang, "header.btn.reset")}
         </button>
 
-        {/* ✅追加：Players */}
-        <button className={buttonBase} onClick={onOpenPlayers} title="Add / Remove / Number">
+        {/* ✅ Players */}
+        <button
+          className={readOnly ? disabledBtn : buttonBase}
+          onClick={onOpenPlayers}
+          title={readOnly ? "View only" : "Add / Remove / Number"}
+        >
           {t(lang, "header.btn.players")}
         </button>
 
-        {/* ✅追加：Language toggle */}
+        {/* ✅ Language toggle（これは閲覧でもOK） */}
         <button className={buttonBase} onClick={toggleLang} title={t(lang, "lang.toggleTitle")}>
           {lang === "ja" ? t(lang, "lang.en") : t(lang, "lang.jp")}
         </button>
@@ -170,13 +186,18 @@ function Header({
   );
 }
 
-function Sidebar({ onOpenAnimation }: { onOpenAnimation: () => void }) {
+function Sidebar({
+  onOpenAnimation,
+  readOnly,
+}: {
+  onOpenAnimation: () => void;
+  readOnly: boolean;
+}) {
   const { activeTool, setTool, penColor, penWidth, setPenColor, setPenWidth } = useDrawStore();
 
   const itemBase = "w-full flex flex-col items-center gap-1 px-2 py-3 text-[11px] cursor-pointer border-l-2 transition";
   const activeItem = itemBase + " border-emerald-400 bg-emerald-500/10 text-emerald-300";
   const inactiveItem = itemBase + " border-transparent text-slate-300 hover:bg:white/5 hover:border-slate-600";
-
   const disabledItem =
     "w-full flex flex-col items-center gap-1 px-2 py-3 text-[11px] border-l-2 border-transparent text-slate-500 opacity-60 cursor-not-allowed";
 
@@ -191,12 +212,14 @@ function Sidebar({ onOpenAnimation }: { onOpenAnimation: () => void }) {
     icon: string;
     disabled?: boolean;
   }) => {
-    if (disabled) {
+    const isDisabled = !!disabled || readOnly;
+
+    if (isDisabled) {
       return (
-        <div className={disabledItem} title="Coming soon">
+        <div className={disabledItem} title={readOnly ? "View only" : "Coming soon"}>
           <span className="text-lg">{icon}</span>
           <span>{label}</span>
-          <span className="text-[9px] text-slate-500">soon</span>
+          <span className="text-[9px] text-slate-500">{readOnly ? "locked" : "soon"}</span>
         </div>
       );
     }
@@ -212,14 +235,22 @@ function Sidebar({ onOpenAnimation }: { onOpenAnimation: () => void }) {
   return (
     <aside className="w-20 bg-slate-900/95 border-r border-slate-800 flex flex-col items-stretch pt-3 pb-4 gap-2">
       <div className="flex-1 flex flex-col gap-1">
-        <ToolButton id="select" label="Select" icon="🖱" />
+        <ToolButton id="select" label="Select" icon="🖱" disabled={false} />
         <ToolButton id="pen" label="Pen" icon="✏️" />
         <ToolButton id="eraser" label="Eraser" icon="🧽" />
 
         <button
-          className="mt-2 w-full flex flex-col items-center gap-1 px-2 py-3 text-[11px] cursor-pointer border-l-2 border-transparent text-slate-300 hover:bg:white/5 hover:border-slate-600 transition"
-          onClick={onOpenAnimation}
-          title="Chapters / Animation"
+          className={[
+            "mt-2 w-full flex flex-col items-center gap-1 px-2 py-3 text-[11px] border-l-2 transition",
+            readOnly
+              ? "border-transparent text-slate-500 opacity-60 cursor-not-allowed"
+              : "cursor-pointer border-transparent text-slate-300 hover:bg:white/5 hover:border-slate-600",
+          ].join(" ")}
+          onClick={() => {
+            if (readOnly) return;
+            onOpenAnimation();
+          }}
+          title={readOnly ? "View only" : "Chapters / Animation"}
         >
           <span className="text-lg">🎞</span>
           <span>Anime</span>
@@ -238,13 +269,18 @@ function Sidebar({ onOpenAnimation }: { onOpenAnimation: () => void }) {
                 key={c}
                 className={`w-4 h-4 rounded-full border ${
                   penColor === c ? "ring-2 ring-emerald-400 border-white" : "border-slate-500"
-                }`}
+                } ${readOnly ? "opacity-50 cursor-not-allowed pointer-events-none" : ""}`}
                 style={{ backgroundColor: c }}
-                onClick={() => setPenColor(c)}
+                onClick={() => {
+                  if (readOnly) return;
+                  setPenColor(c);
+                }}
+                title={readOnly ? "View only" : ""}
               />
             ))}
           </div>
         </div>
+
         <div className="flex flex-col gap-1">
           <span className="text-[10px] text-slate-400">Pen width</span>
           <input
@@ -252,6 +288,7 @@ function Sidebar({ onOpenAnimation }: { onOpenAnimation: () => void }) {
             min={1}
             max={8}
             value={penWidth}
+            disabled={readOnly}
             onChange={(e) => setPenWidth(Number(e.target.value))}
             className="w-full"
           />
@@ -270,8 +307,11 @@ function AnimationPanel({
   recordExt,
   playbackSpeed,
   setPlaybackSpeed,
-  onCopyShareLink,
+  onCopyShareLinkEdit,
+  onCopyShareLinkViewOnly,
   shareCopied,
+  shareCopiedMode,
+  readOnly,
 }: {
   open: boolean;
   onClose: () => void;
@@ -281,8 +321,11 @@ function AnimationPanel({
   recordExt: "mp4" | "webm";
   playbackSpeed: PlaybackSpeed;
   setPlaybackSpeed: (s: PlaybackSpeed) => void;
-  onCopyShareLink: () => void;
+  onCopyShareLinkEdit: () => void;
+  onCopyShareLinkViewOnly: () => void;
   shareCopied: boolean;
+  shareCopiedMode: "edit" | "view" | null;
+  readOnly: boolean;
 }) {
   const isMobile = useIsMobile();
   const {
@@ -313,6 +356,8 @@ function AnimationPanel({
   const danger =
     "px-3 py-1 rounded-md text-xs font-medium bg-rose-500 text-white hover:bg-rose-400 transition";
 
+  const disabledBtn = "px-2 py-1 rounded-md text-xs border border-white/15 opacity-50 cursor-not-allowed";
+
   const slotBtn = (active: boolean, saved: boolean) =>
     [
       "w-8 h-8 rounded-md text-xs font-semibold border transition",
@@ -321,7 +366,6 @@ function AnimationPanel({
     ].join(" ");
 
   const maxH = isMobile ? "max-h-[45vh]" : "max-h-[38vh]";
-
   const [toast, setToast] = useState<string | null>(null);
 
   const downloadJSON = () => {
@@ -399,7 +443,14 @@ function AnimationPanel({
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <button className={primary} onClick={saveChapterAtActive}>
+                  <button
+                    className={readOnly ? disabledBtn : primary}
+                    onClick={() => {
+                      if (readOnly) return;
+                      saveChapterAtActive();
+                    }}
+                    title={readOnly ? "View only" : ""}
+                  >
                     Save
                   </button>
 
@@ -413,7 +464,14 @@ function AnimationPanel({
                     </button>
                   )}
 
-                  <button className={danger} onClick={clearChapters}>
+                  <button
+                    className={readOnly ? disabledBtn : danger}
+                    onClick={() => {
+                      if (readOnly) return;
+                      clearChapters();
+                    }}
+                    title={readOnly ? "View only" : ""}
+                  >
                     Clear
                   </button>
                 </div>
@@ -476,14 +534,27 @@ function AnimationPanel({
 
                 <label className={baseBtn + " cursor-pointer"}>
                   ⬆ Import JSON
-                  <input type="file" accept="application/json" className="hidden" onChange={(e) => onPickFile(e.target.files?.[0] ?? null)} />
+                  <input
+                    type="file"
+                    accept="application/json"
+                    className="hidden"
+                    onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
+                  />
                 </label>
 
-                <button className={baseBtn} onClick={onCopyShareLink}>
-                  🔗 Copy Share Link
+                {/* ✅ Share (Edit / View only) */}
+                <button className={baseBtn} onClick={onCopyShareLinkEdit}>
+                  🔗 Copy Share Link (Edit)
+                </button>
+                <button className={baseBtn} onClick={onCopyShareLinkViewOnly}>
+                  🔒 Copy Share Link (View only)
                 </button>
 
-                {shareCopied && <span className="text-[11px] text-emerald-200">Copied!</span>}
+                {shareCopied && (
+                  <span className="text-[11px] text-emerald-200">
+                    Copied! {shareCopiedMode === "view" ? "(view only)" : "(edit)"}
+                  </span>
+                )}
 
                 <span className="text-[11px] text-slate-500">（自動保存も有効：ブラウザに保存されます）</span>
               </div>
@@ -504,7 +575,7 @@ function AnimationPanel({
 /* =========================
    ✅ Players Panel（追加）
 ========================= */
-function PlayersPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
+function PlayersPanel({ open, onClose, readOnly }: { open: boolean; onClose: () => void; readOnly: boolean }) {
   const isMobile = useIsMobile();
   const { players, selectedId, selectPlayer, addPlayer, removePlayer, setPlayerNumber } = useBoardStore();
 
@@ -514,6 +585,7 @@ function PlayersPanel({ open, onClose }: { open: boolean; onClose: () => void })
   const primary =
     "px-3 py-1 rounded-md text-xs font-medium bg-emerald-500 text-slate-900 hover:bg-emerald-400 transition";
   const danger = "px-3 py-1 rounded-md text-xs font-medium bg-rose-500 text-white hover:bg-rose-400 transition";
+  const disabledBtn = "px-2 py-1 rounded-md text-xs border border-white/15 opacity-50 cursor-not-allowed";
 
   const maxH = isMobile ? "max-h-[45vh]" : "max-h-[38vh]";
 
@@ -553,6 +625,12 @@ function PlayersPanel({ open, onClose }: { open: boolean; onClose: () => void })
             </div>
 
             <div className={["px-4 py-3 overflow-auto", maxH].join(" ")}>
+              {readOnly && (
+                <div className="mb-2 text-[11px] text-amber-200 bg-amber-500/10 border border-amber-400/20 px-2 py-1 rounded">
+                  View only: このパネルでの編集は無効です
+                </div>
+              )}
+
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className="text-[12px] text-slate-200">
                   Selected:{" "}
@@ -567,31 +645,44 @@ function PlayersPanel({ open, onClose }: { open: boolean; onClose: () => void })
 
                 <div className="flex items-center gap-2">
                   {!addPicking ? (
-                    <button className={primary} onClick={() => setAddPicking(true)} title="Add player">
+                    <button
+                      className={readOnly ? disabledBtn : primary}
+                      onClick={() => {
+                        if (readOnly) return;
+                        setAddPicking(true);
+                      }}
+                      title={readOnly ? "View only" : "Add player"}
+                    >
                       + Add
                     </button>
                   ) : (
-                    <button className={baseBtn} onClick={() => setAddPicking(false)} title="Cancel">
+                    <button
+                      className={baseBtn}
+                      onClick={() => {
+                        setAddPicking(false);
+                      }}
+                      title="Cancel"
+                    >
                       Cancel
                     </button>
                   )}
 
                   <button
-                    className={danger}
-                    disabled={!selected}
+                    className={readOnly ? disabledBtn : danger}
+                    disabled={!selected || readOnly}
                     onClick={() => {
-                      if (!selected) return;
+                      if (!selected || readOnly) return;
                       removePlayer(selected.id);
                     }}
-                    title="Remove selected"
-                    style={!selected ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
+                    title={readOnly ? "View only" : "Remove selected"}
+                    style={!selected || readOnly ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
                   >
                     Delete
                   </button>
                 </div>
               </div>
 
-              {addPicking && (
+              {addPicking && !readOnly && (
                 <div className="mt-3 p-3 rounded-lg border border-white/10 bg-white/5">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="text-xs text-slate-300">Add player: teamを選んでください</div>
@@ -645,9 +736,9 @@ function PlayersPanel({ open, onClose }: { open: boolean; onClose: () => void })
                   min={0}
                   max={99}
                   value={selected ? selected.number : ""}
-                  disabled={!selected}
+                  disabled={!selected || readOnly}
                   onChange={(e) => {
-                    if (!selected) return;
+                    if (!selected || readOnly) return;
                     setPlayerNumber(selected.id, Number(e.target.value));
                   }}
                   className="w-24 text-xs bg-slate-900 border border-white/15 rounded px-2 py-1 text-slate-100 disabled:opacity-50"
@@ -828,6 +919,14 @@ export default function App() {
   const page0 = sp0.get("page");
   const isPitch = page0 === "pitch" && !s0;
 
+  // ✅ readOnly（URL: ?ro=1）
+  const [readOnly, setReadOnly] = useState(false);
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const ro = sp.get("ro");
+    setReadOnly(ro === "1" || ro === "true");
+  }, []);
+
   // ✅ 共有URLの ?s= から状態を復元（初回だけ）
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search);
@@ -839,6 +938,7 @@ export default function App() {
       const res = useBoardStore.getState().importAllFromObject(data);
 
       if (res.ok) {
+        // 共有リンクを開いた後は、URLを綺麗にする（ro は残す）
         sp.delete("s");
         sp.delete("page");
         const url = new URL(window.location.href);
@@ -863,8 +963,9 @@ export default function App() {
 
   // ✅ Share link copied
   const [shareCopied, setShareCopied] = useState(false);
+  const [shareCopiedMode, setShareCopiedMode] = useState<"edit" | "view" | null>(null);
 
-  const copyShareLink = async () => {
+  const copyShareLink = async (readOnlyLink: boolean) => {
     try {
       const obj = useBoardStore.getState().exportAllToObject();
       const s = encodeStateToParam(obj);
@@ -873,17 +974,29 @@ export default function App() {
       url.searchParams.set("s", s);
       url.searchParams.delete("page"); // pitch共有はしない
 
+      if (readOnlyLink) url.searchParams.set("ro", "1");
+      else url.searchParams.delete("ro");
+
       await navigator.clipboard.writeText(url.toString());
+
       setShareCopied(true);
-      setTimeout(() => setShareCopied(false), 1500);
+      setShareCopiedMode(readOnlyLink ? "view" : "edit");
+      setTimeout(() => {
+        setShareCopied(false);
+        setShareCopiedMode(null);
+      }, 1500);
     } catch {
       // clipboardがダメな環境用フォールバック
       try {
         const obj = useBoardStore.getState().exportAllToObject();
         const s = encodeStateToParam(obj);
+
         const url = new URL(window.location.href);
         url.searchParams.set("s", s);
         url.searchParams.delete("page");
+
+        if (readOnlyLink) url.searchParams.set("ro", "1");
+        else url.searchParams.delete("ro");
 
         const ta = document.createElement("textarea");
         ta.value = url.toString();
@@ -893,7 +1006,11 @@ export default function App() {
         document.body.removeChild(ta);
 
         setShareCopied(true);
-        setTimeout(() => setShareCopied(false), 1500);
+        setShareCopiedMode(readOnlyLink ? "view" : "edit");
+        setTimeout(() => {
+          setShareCopied(false);
+          setShareCopiedMode(null);
+        }, 1500);
       } catch {
         // 失敗しても落とさない
       }
@@ -965,12 +1082,14 @@ export default function App() {
         onOpenPlayers={() => setPlayersOpen(true)}
         lang={lang}
         toggleLang={toggleLang}
+        readOnly={readOnly}
       />
 
       <ChapterPlayer playbackSpeed={playbackSpeed} />
 
       <div className="flex flex-1 min-h-0">
-        <Sidebar onOpenAnimation={() => setAnimOpen(true)} />
+        <Sidebar onOpenAnimation={() => setAnimOpen(true)} readOnly={readOnly} />
+
         <main ref={mainRef} className="flex-1 min-h-0 min-w-0 bg-slate-900 relative">
           {isPitch ? (
             <PitchPage
@@ -983,7 +1102,8 @@ export default function App() {
             />
           ) : (
             <>
-              {viewMode === "2d" ? <Board2D /> : <Board3D />}
+              {/* ここは次に Board2D / Board3D が readOnly を受け取れるようにする */}
+              {viewMode === "2d" ? <Board2D readOnly={readOnly} /> : <Board3D readOnly={readOnly} />}
               <SeoIntro />
             </>
           )}
@@ -999,11 +1119,14 @@ export default function App() {
         recordExt={recordExt}
         playbackSpeed={playbackSpeed}
         setPlaybackSpeed={setPlaybackSpeed}
-        onCopyShareLink={copyShareLink}
+        onCopyShareLinkEdit={() => copyShareLink(false)}
+        onCopyShareLinkViewOnly={() => copyShareLink(true)}
         shareCopied={shareCopied}
+        shareCopiedMode={shareCopiedMode}
+        readOnly={readOnly}
       />
 
-      <PlayersPanel open={playersOpen} onClose={() => setPlayersOpen(false)} />
+      <PlayersPanel open={playersOpen} onClose={() => setPlayersOpen(false)} readOnly={readOnly} />
     </div>
   );
 }
