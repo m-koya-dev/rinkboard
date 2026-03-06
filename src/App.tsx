@@ -11,6 +11,7 @@ import { decodeStateFromParam, encodeStateToParam } from "./share";
 
 type ViewMode = "2d" | "3d";
 type PlaybackSpeed = 0.5 | 1 | 2;
+type ShareCopiedKind = "edit" | "view" | null;
 
 function useIsMobile() {
   const [w, setW] = useState(window.innerWidth);
@@ -249,8 +250,7 @@ function Sidebar({
   const inactiveItem =
     itemBase + " cursor-pointer border-transparent text-slate-300 hover:bg:white/5 hover:border-slate-600";
   const disabledItem =
-    itemBase +
-    " border-transparent text-slate-500 opacity-50 cursor-not-allowed";
+    itemBase + " border-transparent text-slate-500 opacity-50 cursor-not-allowed";
 
   const ToolButton = ({
     id,
@@ -291,9 +291,7 @@ function Sidebar({
         <ToolButton id="eraser" label="Eraser" icon="🧽" disabled={readOnly} />
 
         <button
-          className={
-            "mt-2 w-full flex flex-col items-center gap-1 px-2 py-3 text-[11px] cursor-pointer border-l-2 border-transparent text-slate-300 hover:bg:white/5 hover:border-slate-600 transition"
-          }
+          className="mt-2 w-full flex flex-col items-center gap-1 px-2 py-3 text-[11px] cursor-pointer border-l-2 border-transparent text-slate-300 hover:bg:white/5 hover:border-slate-600 transition"
           onClick={onOpenAnimation}
           title="Chapters / Animation"
         >
@@ -354,7 +352,8 @@ function AnimationPanel({
   recordExt,
   playbackSpeed,
   setPlaybackSpeed,
-  onCopyShareLink,
+  onCopyEditLink,
+  onCopyViewLink,
   shareCopied,
   readOnly,
 }: {
@@ -366,8 +365,9 @@ function AnimationPanel({
   recordExt: "mp4" | "webm";
   playbackSpeed: PlaybackSpeed;
   setPlaybackSpeed: (s: PlaybackSpeed) => void;
-  onCopyShareLink: () => void;
-  shareCopied: boolean;
+  onCopyEditLink: () => void;
+  onCopyViewLink: () => void;
+  shareCopied: ShareCopiedKind;
   readOnly: boolean;
 }) {
   const isMobile = useIsMobile();
@@ -408,9 +408,7 @@ function AnimationPanel({
   const slotBtn = (active: boolean, saved: boolean, disabled: boolean) =>
     [
       "w-8 h-8 rounded-md text-xs font-semibold border transition",
-      active
-        ? "bg-sky-500 text-white border-sky-400"
-        : "bg-white/5 text-slate-100 border-white/10 hover:bg-white/10",
+      active ? "bg-sky-500 text-white border-sky-400" : "bg-white/5 text-slate-100 border-white/10 hover:bg-white/10",
       saved ? "ring-1 ring-emerald-400/60" : "",
       disabled ? "opacity-40 cursor-not-allowed hover:bg-white/5" : "",
     ].join(" ");
@@ -591,6 +589,7 @@ function AnimationPanel({
                 </span>
               </div>
 
+              {/* JSON Export/Import + Share */}
               <div className="mt-3 flex items-center gap-2 flex-wrap">
                 <button className={`${baseBtn} ${baseBtnEnabled}`} onClick={downloadJSON}>
                   ⬇ Export JSON
@@ -609,11 +608,20 @@ function AnimationPanel({
                   />
                 </label>
 
-                <button className={`${baseBtn} ${baseBtnEnabled}`} onClick={onCopyShareLink}>
-                  🔗 Copy Share Link
+                <button className={`${baseBtn} ${baseBtnEnabled}`} onClick={onCopyEditLink}>
+                  🔗 Copy Edit Link
                 </button>
 
-                {shareCopied && <span className="text-[11px] text-emerald-200">Copied!</span>}
+                <button className={`${baseBtn} ${baseBtnEnabled}`} onClick={onCopyViewLink}>
+                  🔒 Copy View Link
+                </button>
+
+                {shareCopied === "edit" && (
+                  <span className="text-[11px] text-emerald-200">Copied edit link!</span>
+                )}
+                {shareCopied === "view" && (
+                  <span className="text-[11px] text-emerald-200">Copied view-only link!</span>
+                )}
 
                 <span className="text-[11px] text-slate-500">
                   （自動保存も有効：ブラウザに保存されます）
@@ -903,9 +911,9 @@ function ChapterPlayer({ playbackSpeed }: { playbackSpeed: PlaybackSpeed }) {
     let cancelled = false;
 
     const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-
     const timeScale = 1 / playbackSpeed;
-    const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, Math.max(0, ms * timeScale)));
+    const sleep = (ms: number) =>
+      new Promise<void>((r) => setTimeout(r, Math.max(0, ms * timeScale)));
 
     const animateBetween = async (fromIdx: number, toIdx: number) => {
       const from = seq[fromIdx];
@@ -1040,53 +1048,56 @@ export default function App() {
   const [animOpen, setAnimOpen] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState<PlaybackSpeed>(1);
   const [playersOpen, setPlayersOpen] = useState(false);
-  const [shareCopied, setShareCopied] = useState(false);
+  const [shareCopied, setShareCopied] = useState<ShareCopiedKind>(null);
 
-  const copyShareLink = async () => {
+  const buildShareUrl = (viewOnly: boolean) => {
+    const obj = useBoardStore.getState().exportAllToObject();
+    const s = encodeStateToParam(obj);
+
+    const url = new URL(window.location.href);
+    url.searchParams.set("s", s);
+    url.searchParams.delete("page");
+
+    if (viewOnly) {
+      url.searchParams.set("ro", "1");
+    } else {
+      url.searchParams.delete("ro");
+    }
+
+    return url.toString();
+  };
+
+  const copyText = async (text: string) => {
     try {
-      const obj = useBoardStore.getState().exportAllToObject();
-      const s = encodeStateToParam(obj);
-
-      const url = new URL(window.location.href);
-      url.searchParams.set("s", s);
-      url.searchParams.delete("page");
-
-      if (readOnly) {
-        url.searchParams.set("ro", "1");
-      } else {
-        url.searchParams.delete("ro");
-      }
-
-      await navigator.clipboard.writeText(url.toString());
-      setShareCopied(true);
-      setTimeout(() => setShareCopied(false), 1500);
+      await navigator.clipboard.writeText(text);
+      return true;
     } catch {
       try {
-        const obj = useBoardStore.getState().exportAllToObject();
-        const s = encodeStateToParam(obj);
-        const url = new URL(window.location.href);
-        url.searchParams.set("s", s);
-        url.searchParams.delete("page");
-
-        if (readOnly) {
-          url.searchParams.set("ro", "1");
-        } else {
-          url.searchParams.delete("ro");
-        }
-
         const ta = document.createElement("textarea");
-        ta.value = url.toString();
+        ta.value = text;
         document.body.appendChild(ta);
         ta.select();
         document.execCommand("copy");
         document.body.removeChild(ta);
-
-        setShareCopied(true);
-        setTimeout(() => setShareCopied(false), 1500);
+        return true;
       } catch {
-        // 失敗しても落とさない
+        return false;
       }
     }
+  };
+
+  const copyEditLink = async () => {
+    const ok = await copyText(buildShareUrl(false));
+    if (!ok) return;
+    setShareCopied("edit");
+    setTimeout(() => setShareCopied(null), 1500);
+  };
+
+  const copyViewLink = async () => {
+    const ok = await copyText(buildShareUrl(true));
+    if (!ok) return;
+    setShareCopied("view");
+    setTimeout(() => setShareCopied(null), 1500);
   };
 
   const mainRef = useRef<HTMLDivElement | null>(null);
@@ -1195,7 +1206,8 @@ export default function App() {
         recordExt={recordExt}
         playbackSpeed={playbackSpeed}
         setPlaybackSpeed={setPlaybackSpeed}
-        onCopyShareLink={copyShareLink}
+        onCopyEditLink={copyEditLink}
+        onCopyViewLink={copyViewLink}
         shareCopied={shareCopied}
         readOnly={readOnly}
       />
