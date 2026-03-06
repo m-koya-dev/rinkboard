@@ -26,25 +26,31 @@ function useIsMobile() {
  * ※Chrome/Edgeはmp4が通らないことが多く、webmになることが多いです。
  */
 function pickBestMimeType(): { mimeType?: string; ext: "mp4" | "webm" } {
-  // MP4候補（Safari系で通る可能性）
   const mp4Candidates = [
     "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
     "video/mp4;codecs=avc1.64001E,mp4a.40.2",
     "video/mp4",
   ];
 
-  // WebM候補（Chrome/Edgeで通りやすい）
-  const webmCandidates = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
+  const webmCandidates = [
+    "video/webm;codecs=vp9,opus",
+    "video/webm;codecs=vp8,opus",
+    "video/webm",
+  ];
 
   if (typeof MediaRecorder === "undefined") {
     return { ext: "webm" };
   }
 
   for (const m of mp4Candidates) {
-    if ((MediaRecorder as any).isTypeSupported?.(m)) return { mimeType: m, ext: "mp4" };
+    if ((MediaRecorder as any).isTypeSupported?.(m)) {
+      return { mimeType: m, ext: "mp4" };
+    }
   }
   for (const m of webmCandidates) {
-    if ((MediaRecorder as any).isTypeSupported?.(m)) return { mimeType: m, ext: "webm" };
+    if ((MediaRecorder as any).isTypeSupported?.(m)) {
+      return { mimeType: m, ext: "webm" };
+    }
   }
 
   return { ext: "webm" };
@@ -85,16 +91,22 @@ function Header({
 
   const tabBase = "px-3 py-1 rounded-full text-sm font-medium border transition";
   const activeTab = tabBase + " bg-emerald-500 text-white border-emerald-500";
-  const inactiveTab = tabBase + " bg-white/5 text-slate-100 border-white/10 hover:bg-white/10";
+  const inactiveTab =
+    tabBase + " bg-white/5 text-slate-100 border-white/10 hover:bg-white/10";
 
   const buttonBase =
-    "inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium border border-white/15 text-slate-100 hover:bg-white/10 transition";
-
-  const disabledBtn = buttonBase + " opacity-50 cursor-not-allowed pointer-events-none";
+    "inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium border border-white/15 text-slate-100 transition";
+  const buttonEnabled = "hover:bg-white/10";
+  const buttonDisabled = "opacity-40 cursor-not-allowed";
 
   const mode3DBase = "px-2 py-0.5 rounded-full text-[11px] border transition";
   const mode3DActive = mode3DBase + " bg-sky-500 text-white border-sky-400";
-  const mode3DInactive = mode3DBase + " bg-white/5 text-slate-100 border-white/10 hover:bg-white/10";
+  const mode3DInactive =
+    mode3DBase + " bg-white/5 text-slate-100 border-white/10 hover:bg-white/10";
+  const mode3DDisabled =
+    mode3DBase + " bg-white/5 text-slate-500 border-white/10 opacity-50 cursor-not-allowed";
+
+  const editDisabled = readOnly;
 
   return (
     <header className="flex items-center justify-between px-4 py-1 bg-slate-900/95 border-b border-slate-800">
@@ -107,21 +119,21 @@ function Header({
           <span className="text-sm font-semibold text-slate-50">RinkBoard</span>
           <span className="text-[11px] text-slate-400">{t(lang, "header.subtitle")}</span>
         </div>
-
-        {readOnly && (
-          <span className="ml-2 px-2 py-0.5 rounded-full text-[11px] bg-white/10 border border-white/10 text-slate-200">
-            View only
-          </span>
-        )}
       </div>
 
       {/* 中央：ビュー切り替え + 3D操作モード */}
       <div className="flex flex-col items-center gap-1">
         <div className="bg-slate-800/80 border border-slate-700 rounded-full p-1 flex items-center gap-1">
-          <button className={viewMode === "2d" ? activeTab : inactiveTab} onClick={() => setViewMode("2d")}>
+          <button
+            className={viewMode === "2d" ? activeTab : inactiveTab}
+            onClick={() => setViewMode("2d")}
+          >
             {t(lang, "header.view.2d")}
           </button>
-          <button className={viewMode === "3d" ? activeTab : inactiveTab} onClick={() => setViewMode("3d")}>
+          <button
+            className={viewMode === "3d" ? activeTab : inactiveTab}
+            onClick={() => setViewMode("3d")}
+          >
             {t(lang, "header.view.3d")}
           </button>
         </div>
@@ -129,10 +141,21 @@ function Header({
         {viewMode === "3d" && (
           <div className="flex items-center gap-2 text-[11px] text-slate-300">
             <span className="text-[10px] text-slate-400">{t(lang, "header.mode3d.label")}</span>
-            <button className={mode3D === "camera" ? mode3DActive : mode3DInactive} onClick={() => setMode3D("camera")}>
+            <button
+              className={mode3D === "camera" ? mode3DActive : mode3DInactive}
+              onClick={() => setMode3D("camera")}
+            >
               {t(lang, "header.mode3d.camera")}
             </button>
-            <button className={mode3D === "piece" ? mode3DActive : mode3DInactive} onClick={() => setMode3D("piece")}>
+            <button
+              className={readOnly ? mode3DDisabled : mode3D === "piece" ? mode3DActive : mode3DInactive}
+              onClick={() => {
+                if (readOnly) return;
+                setMode3D("piece");
+              }}
+              disabled={readOnly}
+              title={readOnly ? "View only" : undefined}
+            >
               {t(lang, "header.mode3d.pieces")}
             </button>
           </div>
@@ -141,44 +164,68 @@ function Header({
 
       {/* 右：アクション系 */}
       <div className="flex items-center gap-2">
-        {/* ★位置を変えない（あなたの指定） */}
-        <button className={buttonBase} onClick={onOpenAnimation}>
+        {readOnly && (
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium bg-amber-500/15 text-amber-200 border border-amber-400/25">
+            🔒 View only
+          </span>
+        )}
+
+        <button
+          className={`${buttonBase} ${buttonEnabled}`}
+          onClick={onOpenAnimation}
+        >
           {t(lang, "header.btn.animation")}
         </button>
 
-        <button className={readOnly ? disabledBtn : buttonBase} onClick={undo} title={readOnly ? "View only" : ""}>
+        <button
+          className={`${buttonBase} ${editDisabled ? buttonDisabled : buttonEnabled}`}
+          onClick={undo}
+          disabled={editDisabled}
+        >
           {t(lang, "header.btn.undo")}
         </button>
-        <button className={readOnly ? disabledBtn : buttonBase} onClick={redo} title={readOnly ? "View only" : ""}>
+
+        <button
+          className={`${buttonBase} ${editDisabled ? buttonDisabled : buttonEnabled}`}
+          onClick={redo}
+          disabled={editDisabled}
+        >
           {t(lang, "header.btn.redo")}
         </button>
 
-        <button className={readOnly ? disabledBtn : buttonBase} onClick={rotateBoard} title={readOnly ? "View only" : ""}>
+        <button
+          className={`${buttonBase} ${editDisabled ? buttonDisabled : buttonEnabled}`}
+          onClick={rotateBoard}
+          disabled={editDisabled}
+        >
           {t(lang, "header.btn.rotate")}
         </button>
 
         <button
-          className={readOnly ? disabledBtn : buttonBase}
+          className={`${buttonBase} ${editDisabled ? buttonDisabled : buttonEnabled}`}
           onClick={() => {
             clearAllLines();
             resetPositions();
           }}
-          title={readOnly ? "View only" : ""}
+          disabled={editDisabled}
         >
           {t(lang, "header.btn.reset")}
         </button>
 
-        {/* ✅ Players */}
         <button
-          className={readOnly ? disabledBtn : buttonBase}
+          className={`${buttonBase} ${editDisabled ? buttonDisabled : buttonEnabled}`}
           onClick={onOpenPlayers}
+          disabled={editDisabled}
           title={readOnly ? "View only" : "Add / Remove / Number"}
         >
           {t(lang, "header.btn.players")}
         </button>
 
-        {/* ✅ Language toggle（これは閲覧でもOK） */}
-        <button className={buttonBase} onClick={toggleLang} title={t(lang, "lang.toggleTitle")}>
+        <button
+          className={`${buttonBase} ${buttonEnabled}`}
+          onClick={toggleLang}
+          title={t(lang, "lang.toggleTitle")}
+        >
           {lang === "ja" ? t(lang, "lang.en") : t(lang, "lang.jp")}
         </button>
       </div>
@@ -195,11 +242,15 @@ function Sidebar({
 }) {
   const { activeTool, setTool, penColor, penWidth, setPenColor, setPenWidth } = useDrawStore();
 
-  const itemBase = "w-full flex flex-col items-center gap-1 px-2 py-3 text-[11px] cursor-pointer border-l-2 transition";
-  const activeItem = itemBase + " border-emerald-400 bg-emerald-500/10 text-emerald-300";
-  const inactiveItem = itemBase + " border-transparent text-slate-300 hover:bg:white/5 hover:border-slate-600";
+  const itemBase =
+    "w-full flex flex-col items-center gap-1 px-2 py-3 text-[11px] border-l-2 transition";
+  const activeItem =
+    itemBase + " cursor-pointer border-emerald-400 bg-emerald-500/10 text-emerald-300";
+  const inactiveItem =
+    itemBase + " cursor-pointer border-transparent text-slate-300 hover:bg:white/5 hover:border-slate-600";
   const disabledItem =
-    "w-full flex flex-col items-center gap-1 px-2 py-3 text-[11px] border-l-2 border-transparent text-slate-500 opacity-60 cursor-not-allowed";
+    itemBase +
+    " border-transparent text-slate-500 opacity-50 cursor-not-allowed";
 
   const ToolButton = ({
     id,
@@ -212,20 +263,20 @@ function Sidebar({
     icon: string;
     disabled?: boolean;
   }) => {
-    const isDisabled = !!disabled || readOnly;
-
-    if (isDisabled) {
+    if (disabled) {
       return (
-        <div className={disabledItem} title={readOnly ? "View only" : "Coming soon"}>
+        <div className={disabledItem} title="View only">
           <span className="text-lg">{icon}</span>
           <span>{label}</span>
-          <span className="text-[9px] text-slate-500">{readOnly ? "locked" : "soon"}</span>
         </div>
       );
     }
 
     return (
-      <button className={activeTool === id ? activeItem : inactiveItem} onClick={() => setTool(id)}>
+      <button
+        className={activeTool === id ? activeItem : inactiveItem}
+        onClick={() => setTool(id)}
+      >
         <span className="text-lg">{icon}</span>
         <span>{label}</span>
       </button>
@@ -235,29 +286,23 @@ function Sidebar({
   return (
     <aside className="w-20 bg-slate-900/95 border-r border-slate-800 flex flex-col items-stretch pt-3 pb-4 gap-2">
       <div className="flex-1 flex flex-col gap-1">
-        <ToolButton id="select" label="Select" icon="🖱" disabled={false} />
-        <ToolButton id="pen" label="Pen" icon="✏️" />
-        <ToolButton id="eraser" label="Eraser" icon="🧽" />
+        <ToolButton id="select" label="Select" icon="🖱" />
+        <ToolButton id="pen" label="Pen" icon="✏️" disabled={readOnly} />
+        <ToolButton id="eraser" label="Eraser" icon="🧽" disabled={readOnly} />
 
         <button
-          className={[
-            "mt-2 w-full flex flex-col items-center gap-1 px-2 py-3 text-[11px] border-l-2 transition",
-            readOnly
-              ? "border-transparent text-slate-500 opacity-60 cursor-not-allowed"
-              : "cursor-pointer border-transparent text-slate-300 hover:bg:white/5 hover:border-slate-600",
-          ].join(" ")}
-          onClick={() => {
-            if (readOnly) return;
-            onOpenAnimation();
-          }}
-          title={readOnly ? "View only" : "Chapters / Animation"}
+          className={
+            "mt-2 w-full flex flex-col items-center gap-1 px-2 py-3 text-[11px] cursor-pointer border-l-2 border-transparent text-slate-300 hover:bg:white/5 hover:border-slate-600 transition"
+          }
+          onClick={onOpenAnimation}
+          title="Chapters / Animation"
         >
           <span className="text-lg">🎞</span>
           <span>Anime</span>
         </button>
 
         <ToolButton id="arrow" label="Arrow" icon="➡️" disabled />
-        <ToolButton id="text" label="Text" icon="🅣" />
+        <ToolButton id="text" label="Text" icon="🅣" disabled={readOnly} />
       </div>
 
       <div className="border-t border-slate-700 pt-2 px-2 flex flex-col gap-2">
@@ -269,18 +314,17 @@ function Sidebar({
                 key={c}
                 className={`w-4 h-4 rounded-full border ${
                   penColor === c ? "ring-2 ring-emerald-400 border-white" : "border-slate-500"
-                } ${readOnly ? "opacity-50 cursor-not-allowed pointer-events-none" : ""}`}
+                } ${readOnly ? "opacity-40 cursor-not-allowed" : ""}`}
                 style={{ backgroundColor: c }}
                 onClick={() => {
                   if (readOnly) return;
                   setPenColor(c);
                 }}
-                title={readOnly ? "View only" : ""}
+                disabled={readOnly}
               />
             ))}
           </div>
         </div>
-
         <div className="flex flex-col gap-1">
           <span className="text-[10px] text-slate-400">Pen width</span>
           <input
@@ -288,9 +332,12 @@ function Sidebar({
             min={1}
             max={8}
             value={penWidth}
+            onChange={(e) => {
+              if (readOnly) return;
+              setPenWidth(Number(e.target.value));
+            }}
+            className={`w-full ${readOnly ? "opacity-40 cursor-not-allowed" : ""}`}
             disabled={readOnly}
-            onChange={(e) => setPenWidth(Number(e.target.value))}
-            className="w-full"
           />
         </div>
       </div>
@@ -307,10 +354,8 @@ function AnimationPanel({
   recordExt,
   playbackSpeed,
   setPlaybackSpeed,
-  onCopyShareLinkEdit,
-  onCopyShareLinkViewOnly,
+  onCopyShareLink,
   shareCopied,
-  shareCopiedMode,
   readOnly,
 }: {
   open: boolean;
@@ -321,10 +366,8 @@ function AnimationPanel({
   recordExt: "mp4" | "webm";
   playbackSpeed: PlaybackSpeed;
   setPlaybackSpeed: (s: PlaybackSpeed) => void;
-  onCopyShareLinkEdit: () => void;
-  onCopyShareLinkViewOnly: () => void;
+  onCopyShareLink: () => void;
   shareCopied: boolean;
-  shareCopiedMode: "edit" | "view" | null;
   readOnly: boolean;
 }) {
   const isMobile = useIsMobile();
@@ -350,22 +393,30 @@ function AnimationPanel({
     return fixed;
   }, [chapters]);
 
-  const baseBtn = "px-2 py-1 rounded-md text-xs border border-white/15 hover:bg-white/10 transition";
+  const baseBtn = "px-2 py-1 rounded-md text-xs border border-white/15 transition";
+  const baseBtnEnabled = "hover:bg-white/10";
+  const baseBtnDisabled = "opacity-40 cursor-not-allowed";
   const primary =
     "px-3 py-1 rounded-md text-xs font-medium bg-emerald-500 text-slate-900 hover:bg-emerald-400 transition";
+  const primaryDisabled =
+    "px-3 py-1 rounded-md text-xs font-medium bg-emerald-500 text-slate-900 opacity-40 cursor-not-allowed";
   const danger =
     "px-3 py-1 rounded-md text-xs font-medium bg-rose-500 text-white hover:bg-rose-400 transition";
+  const dangerDisabled =
+    "px-3 py-1 rounded-md text-xs font-medium bg-rose-500 text-white opacity-40 cursor-not-allowed";
 
-  const disabledBtn = "px-2 py-1 rounded-md text-xs border border-white/15 opacity-50 cursor-not-allowed";
-
-  const slotBtn = (active: boolean, saved: boolean) =>
+  const slotBtn = (active: boolean, saved: boolean, disabled: boolean) =>
     [
       "w-8 h-8 rounded-md text-xs font-semibold border transition",
-      active ? "bg-sky-500 text-white border-sky-400" : "bg-white/5 text-slate-100 border-white/10 hover:bg-white/10",
+      active
+        ? "bg-sky-500 text-white border-sky-400"
+        : "bg-white/5 text-slate-100 border-white/10 hover:bg-white/10",
       saved ? "ring-1 ring-emerald-400/60" : "",
+      disabled ? "opacity-40 cursor-not-allowed hover:bg-white/5" : "",
     ].join(" ");
 
   const maxH = isMobile ? "max-h-[45vh]" : "max-h-[38vh]";
+
   const [toast, setToast] = useState<string | null>(null);
 
   const downloadJSON = () => {
@@ -373,7 +424,10 @@ function AnimationPanel({
       const obj = exportAllToObject();
       const json = JSON.stringify(obj, null, 2);
       const blob = new Blob([json], { type: "application/json" });
-      downloadBlob(blob, `rinkboard-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.json`);
+      downloadBlob(
+        blob,
+        `rinkboard-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.json`
+      );
       setToast("JSONを書き出しました（ダウンロード）");
       setTimeout(() => setToast(null), 2000);
     } catch {
@@ -383,7 +437,7 @@ function AnimationPanel({
   };
 
   const onPickFile = async (file: File | null) => {
-    if (!file) return;
+    if (!file || readOnly) return;
     try {
       const text = await file.text();
       const parsed = JSON.parse(text);
@@ -399,7 +453,9 @@ function AnimationPanel({
   const speedBtn = (s: PlaybackSpeed) =>
     [
       "px-2 py-1 rounded-md text-xs border transition",
-      s === playbackSpeed ? "bg-emerald-400 text-slate-900 border-emerald-300" : "bg-white/5 text-slate-100 border-white/10 hover:bg-white/10",
+      s === playbackSpeed
+        ? "bg-emerald-400 text-slate-900 border-emerald-300"
+        : "bg-white/5 text-slate-100 border-white/10 hover:bg-white/10",
     ].join(" ");
 
   return (
@@ -420,6 +476,11 @@ function AnimationPanel({
                 <div className="w-10 h-1.5 rounded-full bg-slate-600/70" />
                 <span className="text-sm text-slate-100 font-semibold">Animation / Chapters</span>
                 <span className="text-[11px] text-slate-400">（最大10）</span>
+                {readOnly && (
+                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-200 border border-amber-400/25">
+                    🔒 View only
+                  </span>
+                )}
               </div>
               <button className="text-slate-300 hover:text-white text-sm" onClick={onClose} title="Close">
                 ✕
@@ -444,40 +505,33 @@ function AnimationPanel({
 
                 <div className="flex items-center gap-2">
                   <button
-                    className={readOnly ? disabledBtn : primary}
-                    onClick={() => {
-                      if (readOnly) return;
-                      saveChapterAtActive();
-                    }}
-                    title={readOnly ? "View only" : ""}
+                    className={readOnly ? primaryDisabled : primary}
+                    onClick={saveChapterAtActive}
+                    disabled={readOnly}
                   >
                     Save
                   </button>
 
                   {!isPlayingChapters ? (
-                    <button className={baseBtn} onClick={startPlayChapters}>
+                    <button className={`${baseBtn} ${baseBtnEnabled}`} onClick={startPlayChapters}>
                       ▶ Play
                     </button>
                   ) : (
-                    <button className={baseBtn} onClick={stopPlayChapters}>
+                    <button className={`${baseBtn} ${baseBtnEnabled}`} onClick={stopPlayChapters}>
                       ■ Stop
                     </button>
                   )}
 
                   <button
-                    className={readOnly ? disabledBtn : danger}
-                    onClick={() => {
-                      if (readOnly) return;
-                      clearChapters();
-                    }}
-                    title={readOnly ? "View only" : ""}
+                    className={readOnly ? dangerDisabled : danger}
+                    onClick={clearChapters}
+                    disabled={readOnly}
                   >
                     Clear
                   </button>
                 </div>
               </div>
 
-              {/* ✅ 再生速度 */}
               <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-slate-300">Speed</span>
@@ -502,9 +556,19 @@ function AnimationPanel({
                   return (
                     <button
                       key={i}
-                      className={slotBtn(i === activeChapterIndex, saved)}
-                      title={saved ? `Saved: Chapter ${i + 1}` : `Empty: Chapter ${i + 1}`}
-                      onClick={() => switchChapter(i)}
+                      className={slotBtn(i === activeChapterIndex, saved, readOnly)}
+                      title={
+                        readOnly
+                          ? "View only"
+                          : saved
+                          ? `Saved: Chapter ${i + 1}`
+                          : `Empty: Chapter ${i + 1}`
+                      }
+                      onClick={() => {
+                        if (readOnly) return;
+                        switchChapter(i);
+                      }}
+                      disabled={readOnly}
                     >
                       {i + 1}
                     </button>
@@ -512,57 +576,60 @@ function AnimationPanel({
                 })}
               </div>
 
-              {/* 録画 */}
               <div className="mt-4 flex items-center gap-2 flex-wrap">
                 {!recording ? (
-                  <button className={baseBtn} onClick={onStartRecord}>
+                  <button className={`${baseBtn} ${baseBtnEnabled}`} onClick={onStartRecord}>
                     ● Record ({recordExt.toUpperCase()})
                   </button>
                 ) : (
-                  <button className={baseBtn} onClick={onStopRecord}>
+                  <button className={`${baseBtn} ${baseBtnEnabled}`} onClick={onStopRecord}>
                     ■ Stop & Save
                   </button>
                 )}
-                <span className="text-[11px] text-slate-500">※MP4はブラウザ対応次第。非対応環境はWebMで保存されます。</span>
+                <span className="text-[11px] text-slate-500">
+                  ※MP4はブラウザ対応次第。非対応環境はWebMで保存されます。
+                </span>
               </div>
 
-              {/* JSON Export/Import + Share */}
               <div className="mt-3 flex items-center gap-2 flex-wrap">
-                <button className={baseBtn} onClick={downloadJSON}>
+                <button className={`${baseBtn} ${baseBtnEnabled}`} onClick={downloadJSON}>
                   ⬇ Export JSON
                 </button>
 
-                <label className={baseBtn + " cursor-pointer"}>
+                <label
+                  className={`${baseBtn} ${readOnly ? baseBtnDisabled : baseBtnEnabled} cursor-pointer`}
+                >
                   ⬆ Import JSON
                   <input
                     type="file"
                     accept="application/json"
                     className="hidden"
                     onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
+                    disabled={readOnly}
                   />
                 </label>
 
-                {/* ✅ Share (Edit / View only) */}
-                <button className={baseBtn} onClick={onCopyShareLinkEdit}>
-                  🔗 Copy Share Link (Edit)
-                </button>
-                <button className={baseBtn} onClick={onCopyShareLinkViewOnly}>
-                  🔒 Copy Share Link (View only)
+                <button className={`${baseBtn} ${baseBtnEnabled}`} onClick={onCopyShareLink}>
+                  🔗 Copy Share Link
                 </button>
 
-                {shareCopied && (
-                  <span className="text-[11px] text-emerald-200">
-                    Copied! {shareCopiedMode === "view" ? "(view only)" : "(edit)"}
-                  </span>
-                )}
+                {shareCopied && <span className="text-[11px] text-emerald-200">Copied!</span>}
 
-                <span className="text-[11px] text-slate-500">（自動保存も有効：ブラウザに保存されます）</span>
+                <span className="text-[11px] text-slate-500">
+                  （自動保存も有効：ブラウザに保存されます）
+                </span>
               </div>
 
               <div className="mt-3 text-[11px] text-slate-400 leading-relaxed">
                 ・3Dでも「駒/ボールの動き」は再生できます（線は2D専用なので3Dでは表示されません）
                 <br />
                 ・閉じるとリンクが全面表示になります
+                {readOnly && (
+                  <>
+                    <br />
+                    ・閲覧モードでは Save / Clear / Import / chapter切替 は無効です
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -575,29 +642,44 @@ function AnimationPanel({
 /* =========================
    ✅ Players Panel（追加）
 ========================= */
-function PlayersPanel({ open, onClose, readOnly }: { open: boolean; onClose: () => void; readOnly: boolean }) {
+function PlayersPanel({
+  open,
+  onClose,
+  readOnly,
+}: {
+  open: boolean;
+  onClose: () => void;
+  readOnly: boolean;
+}) {
   const isMobile = useIsMobile();
   const { players, selectedId, selectPlayer, addPlayer, removePlayer, setPlayerNumber } = useBoardStore();
 
   const selected = players.find((p) => p.id === selectedId) ?? null;
 
-  const baseBtn = "px-2 py-1 rounded-md text-xs border border-white/15 hover:bg-white/10 transition";
+  const baseBtn = "px-2 py-1 rounded-md text-xs border border-white/15 transition";
+  const baseBtnEnabled = "hover:bg-white/10";
+  const baseBtnDisabled = "opacity-40 cursor-not-allowed";
   const primary =
     "px-3 py-1 rounded-md text-xs font-medium bg-emerald-500 text-slate-900 hover:bg-emerald-400 transition";
-  const danger = "px-3 py-1 rounded-md text-xs font-medium bg-rose-500 text-white hover:bg-rose-400 transition";
-  const disabledBtn = "px-2 py-1 rounded-md text-xs border border-white/15 opacity-50 cursor-not-allowed";
+  const primaryDisabled =
+    "px-3 py-1 rounded-md text-xs font-medium bg-emerald-500 text-slate-900 opacity-40 cursor-not-allowed";
+  const danger =
+    "px-3 py-1 rounded-md text-xs font-medium bg-rose-500 text-white hover:bg-rose-400 transition";
+  const dangerDisabled =
+    "px-3 py-1 rounded-md text-xs font-medium bg-rose-500 text-white opacity-40 cursor-not-allowed";
 
   const maxH = isMobile ? "max-h-[45vh]" : "max-h-[38vh]";
 
   const [addPicking, setAddPicking] = useState(false);
   const [addRole, setAddRole] = useState<Role>("FP");
 
-  const teamBtn = (team: TeamId) =>
+  const teamBtn = (team: TeamId, disabled: boolean) =>
     [
       "px-3 py-1 rounded-md text-xs font-medium border transition",
       team === "A"
         ? "bg-sky-500/20 text-sky-200 border-sky-400/40 hover:bg-sky-500/30"
         : "bg-orange-500/20 text-orange-200 border-orange-400/40 hover:bg-orange-500/30",
+      disabled ? "opacity-40 cursor-not-allowed hover:bg-transparent" : "",
     ].join(" ");
 
   return (
@@ -618,6 +700,11 @@ function PlayersPanel({ open, onClose, readOnly }: { open: boolean; onClose: () 
                 <div className="w-10 h-1.5 rounded-full bg-slate-600/70" />
                 <span className="text-sm text-slate-100 font-semibold">Players</span>
                 <span className="text-[11px] text-slate-400">（追加 / 削除 / 背番号）</span>
+                {readOnly && (
+                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-200 border border-amber-400/25">
+                    🔒 View only
+                  </span>
+                )}
               </div>
               <button className="text-slate-300 hover:text-white text-sm" onClick={onClose} title="Close">
                 ✕
@@ -625,12 +712,6 @@ function PlayersPanel({ open, onClose, readOnly }: { open: boolean; onClose: () 
             </div>
 
             <div className={["px-4 py-3 overflow-auto", maxH].join(" ")}>
-              {readOnly && (
-                <div className="mb-2 text-[11px] text-amber-200 bg-amber-500/10 border border-amber-400/20 px-2 py-1 rounded">
-                  View only: このパネルでの編集は無効です
-                </div>
-              )}
-
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className="text-[12px] text-slate-200">
                   Selected:{" "}
@@ -646,21 +727,24 @@ function PlayersPanel({ open, onClose, readOnly }: { open: boolean; onClose: () 
                 <div className="flex items-center gap-2">
                   {!addPicking ? (
                     <button
-                      className={readOnly ? disabledBtn : primary}
+                      className={readOnly ? primaryDisabled : primary}
                       onClick={() => {
                         if (readOnly) return;
                         setAddPicking(true);
                       }}
+                      disabled={readOnly}
                       title={readOnly ? "View only" : "Add player"}
                     >
                       + Add
                     </button>
                   ) : (
                     <button
-                      className={baseBtn}
+                      className={`${baseBtn} ${readOnly ? baseBtnDisabled : baseBtnEnabled}`}
                       onClick={() => {
+                        if (readOnly) return;
                         setAddPicking(false);
                       }}
+                      disabled={readOnly}
                       title="Cancel"
                     >
                       Cancel
@@ -668,21 +752,20 @@ function PlayersPanel({ open, onClose, readOnly }: { open: boolean; onClose: () 
                   )}
 
                   <button
-                    className={readOnly ? disabledBtn : danger}
-                    disabled={!selected || readOnly}
+                    className={readOnly || !selected ? dangerDisabled : danger}
+                    disabled={readOnly || !selected}
                     onClick={() => {
-                      if (!selected || readOnly) return;
+                      if (readOnly || !selected) return;
                       removePlayer(selected.id);
                     }}
                     title={readOnly ? "View only" : "Remove selected"}
-                    style={!selected || readOnly ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
                   >
                     Delete
                   </button>
                 </div>
               </div>
 
-              {addPicking && !readOnly && (
+              {addPicking && (
                 <div className="mt-3 p-3 rounded-lg border border-white/10 bg-white/5">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="text-xs text-slate-300">Add player: teamを選んでください</div>
@@ -690,9 +773,15 @@ function PlayersPanel({ open, onClose, readOnly }: { open: boolean; onClose: () 
                     <div className="flex items-center gap-2">
                       <span className="text-[11px] text-slate-400">Role</span>
                       <select
-                        className="text-xs bg-slate-900 border border-white/15 rounded px-2 py-1 text-slate-100"
+                        className={`text-xs bg-slate-900 border border-white/15 rounded px-2 py-1 text-slate-100 ${
+                          readOnly ? "opacity-40 cursor-not-allowed" : ""
+                        }`}
                         value={addRole}
-                        onChange={(e) => setAddRole((e.target.value as Role) ?? "FP")}
+                        onChange={(e) => {
+                          if (readOnly) return;
+                          setAddRole((e.target.value as Role) ?? "FP");
+                        }}
+                        disabled={readOnly}
                       >
                         <option value="FP">FP</option>
                         <option value="GK">GK</option>
@@ -702,20 +791,24 @@ function PlayersPanel({ open, onClose, readOnly }: { open: boolean; onClose: () 
 
                   <div className="mt-2 flex items-center gap-2">
                     <button
-                      className={teamBtn("A")}
+                      className={teamBtn("A", readOnly)}
                       onClick={() => {
+                        if (readOnly) return;
                         addPlayer("A", addRole);
                         setAddPicking(false);
                       }}
+                      disabled={readOnly}
                     >
                       Team A
                     </button>
                     <button
-                      className={teamBtn("B")}
+                      className={teamBtn("B", readOnly)}
                       onClick={() => {
+                        if (readOnly) return;
                         addPlayer("B", addRole);
                         setAddPicking(false);
                       }}
+                      disabled={readOnly}
                     >
                       Team B
                     </button>
@@ -736,9 +829,9 @@ function PlayersPanel({ open, onClose, readOnly }: { open: boolean; onClose: () 
                   min={0}
                   max={99}
                   value={selected ? selected.number : ""}
-                  disabled={!selected || readOnly}
+                  disabled={readOnly || !selected}
                   onChange={(e) => {
-                    if (!selected || readOnly) return;
+                    if (readOnly || !selected) return;
                     setPlayerNumber(selected.id, Number(e.target.value));
                   }}
                   className="w-24 text-xs bg-slate-900 border border-white/15 rounded px-2 py-1 text-slate-100 disabled:opacity-50"
@@ -811,7 +904,6 @@ function ChapterPlayer({ playbackSpeed }: { playbackSpeed: PlaybackSpeed }) {
 
     const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
-    // speed: 2x => 時間を1/2、0.5x => 時間を2倍
     const timeScale = 1 / playbackSpeed;
     const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, Math.max(0, ms * timeScale)));
 
@@ -913,21 +1005,14 @@ function ChapterPlayer({ playbackSpeed }: { playbackSpeed: PlaybackSpeed }) {
 export default function App() {
   const { lang, toggleLang } = useUiStore();
 
-  // ✅ URLパラメータ初回読み取り（s がある時は pitch より復元を優先）
   const sp0 = new URLSearchParams(window.location.search);
   const s0 = sp0.get("s");
   const page0 = sp0.get("page");
+  const ro0 = sp0.get("ro");
+  const readOnly = ro0 === "1";
+
   const isPitch = page0 === "pitch" && !s0;
 
-  // ✅ readOnly（URL: ?ro=1）
-  const [readOnly, setReadOnly] = useState(false);
-  useEffect(() => {
-    const sp = new URLSearchParams(window.location.search);
-    const ro = sp.get("ro");
-    setReadOnly(ro === "1" || ro === "true");
-  }, []);
-
-  // ✅ 共有URLの ?s= から状態を復元（初回だけ）
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search);
     const s = sp.get("s");
@@ -938,7 +1023,6 @@ export default function App() {
       const res = useBoardStore.getState().importAllFromObject(data);
 
       if (res.ok) {
-        // 共有リンクを開いた後は、URLを綺麗にする（ro は残す）
         sp.delete("s");
         sp.delete("page");
         const url = new URL(window.location.href);
@@ -954,49 +1038,41 @@ export default function App() {
   const { mode3D, setMode3D } = useBoardStore();
 
   const [animOpen, setAnimOpen] = useState(false);
-
-  // ✅ 再生速度
   const [playbackSpeed, setPlaybackSpeed] = useState<PlaybackSpeed>(1);
-
-  // ✅ Players Panel
   const [playersOpen, setPlayersOpen] = useState(false);
-
-  // ✅ Share link copied
   const [shareCopied, setShareCopied] = useState(false);
-  const [shareCopiedMode, setShareCopiedMode] = useState<"edit" | "view" | null>(null);
 
-  const copyShareLink = async (readOnlyLink: boolean) => {
+  const copyShareLink = async () => {
     try {
       const obj = useBoardStore.getState().exportAllToObject();
       const s = encodeStateToParam(obj);
 
       const url = new URL(window.location.href);
       url.searchParams.set("s", s);
-      url.searchParams.delete("page"); // pitch共有はしない
+      url.searchParams.delete("page");
 
-      if (readOnlyLink) url.searchParams.set("ro", "1");
-      else url.searchParams.delete("ro");
+      if (readOnly) {
+        url.searchParams.set("ro", "1");
+      } else {
+        url.searchParams.delete("ro");
+      }
 
       await navigator.clipboard.writeText(url.toString());
-
       setShareCopied(true);
-      setShareCopiedMode(readOnlyLink ? "view" : "edit");
-      setTimeout(() => {
-        setShareCopied(false);
-        setShareCopiedMode(null);
-      }, 1500);
+      setTimeout(() => setShareCopied(false), 1500);
     } catch {
-      // clipboardがダメな環境用フォールバック
       try {
         const obj = useBoardStore.getState().exportAllToObject();
         const s = encodeStateToParam(obj);
-
         const url = new URL(window.location.href);
         url.searchParams.set("s", s);
         url.searchParams.delete("page");
 
-        if (readOnlyLink) url.searchParams.set("ro", "1");
-        else url.searchParams.delete("ro");
+        if (readOnly) {
+          url.searchParams.set("ro", "1");
+        } else {
+          url.searchParams.delete("ro");
+        }
 
         const ta = document.createElement("textarea");
         ta.value = url.toString();
@@ -1006,18 +1082,13 @@ export default function App() {
         document.body.removeChild(ta);
 
         setShareCopied(true);
-        setShareCopiedMode(readOnlyLink ? "view" : "edit");
-        setTimeout(() => {
-          setShareCopied(false);
-          setShareCopiedMode(null);
-        }, 1500);
+        setTimeout(() => setShareCopied(false), 1500);
       } catch {
         // 失敗しても落とさない
       }
     }
   };
 
-  // 録画
   const mainRef = useRef<HTMLDivElement | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
@@ -1079,7 +1150,10 @@ export default function App() {
         mode3D={mode3D}
         setMode3D={setMode3D}
         onOpenAnimation={() => setAnimOpen(true)}
-        onOpenPlayers={() => setPlayersOpen(true)}
+        onOpenPlayers={() => {
+          if (readOnly) return;
+          setPlayersOpen(true);
+        }}
         lang={lang}
         toggleLang={toggleLang}
         readOnly={readOnly}
@@ -1089,7 +1163,6 @@ export default function App() {
 
       <div className="flex flex-1 min-h-0">
         <Sidebar onOpenAnimation={() => setAnimOpen(true)} readOnly={readOnly} />
-
         <main ref={mainRef} className="flex-1 min-h-0 min-w-0 bg-slate-900 relative">
           {isPitch ? (
             <PitchPage
@@ -1102,8 +1175,11 @@ export default function App() {
             />
           ) : (
             <>
-              {/* ここは次に Board2D / Board3D が readOnly を受け取れるようにする */}
-              {viewMode === "2d" ? <Board2D readOnly={readOnly} /> : <Board3D readOnly={readOnly} />}
+              {viewMode === "2d" ? (
+                <Board2D readOnly={readOnly} />
+              ) : (
+                <Board3D readOnly={readOnly} />
+              )}
               <SeoIntro />
             </>
           )}
@@ -1119,14 +1195,16 @@ export default function App() {
         recordExt={recordExt}
         playbackSpeed={playbackSpeed}
         setPlaybackSpeed={setPlaybackSpeed}
-        onCopyShareLinkEdit={() => copyShareLink(false)}
-        onCopyShareLinkViewOnly={() => copyShareLink(true)}
+        onCopyShareLink={copyShareLink}
         shareCopied={shareCopied}
-        shareCopiedMode={shareCopiedMode}
         readOnly={readOnly}
       />
 
-      <PlayersPanel open={playersOpen} onClose={() => setPlayersOpen(false)} readOnly={readOnly} />
+      <PlayersPanel
+        open={playersOpen}
+        onClose={() => setPlayersOpen(false)}
+        readOnly={readOnly}
+      />
     </div>
   );
 }
