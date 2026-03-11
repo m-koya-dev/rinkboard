@@ -1,4 +1,3 @@
-// src/store.ts
 import { create } from "zustand";
 
 /**
@@ -69,10 +68,22 @@ export interface Ball {
   y: number;
 }
 
-/* ====== ペン・線・テキストの管理（描画） ====== */
+/* ====== ペン・線・矢印・テキストの管理（描画） ====== */
 
 export interface DrawLine {
   points: number[]; // [x1,y1,x2,y2,...] （ワールド座標）
+  color: string;
+  width: number;
+}
+
+export interface DrawArrow {
+  id: string;
+  x1: number; // world
+  y1: number; // world
+  x2: number; // world
+  y2: number; // world
+  cx?: number; // world: 制御点（曲線用）
+  cy?: number; // world: 制御点（曲線用）
   color: string;
   width: number;
 }
@@ -83,20 +94,22 @@ export interface DrawText {
   y: number; // world
   text: string;
   color: string;
-  fontSize: number; // world基準ではなく「見た目用」(px相当)
-  boxW?: number;    // ✅追加：テキスト枠の幅(px)
-  boxH?: number; // ✅追加（縦リサイズ用）
+  fontSize: number; // px相当
+  boxW?: number;
+  boxH?: number;
 }
 
 type Tool = "select" | "pen" | "eraser" | "arrow" | "text";
 
 type DrawSnapshot = {
   lines: DrawLine[];
+  arrows: DrawArrow[];
   texts: DrawText[];
 };
 
 interface DrawState {
   lines: DrawLine[];
+  arrows: DrawArrow[];
   texts: DrawText[];
 
   penEnabled: boolean;
@@ -107,8 +120,11 @@ interface DrawState {
 
   // text用
   textColor: string;
-  textSize: number; // px相当
+  textSize: number;
   selectedTextId: string | null;
+
+  // arrow用
+  selectedArrowId: string | null;
 
   // 履歴（Undo/Redo）
   history: DrawSnapshot[];
@@ -123,6 +139,11 @@ interface DrawState {
   setTextSize: (size: number) => void;
   selectText: (id: string | null) => void;
 
+  selectArrow: (id: string | null) => void;
+  addArrow: (arrow: Omit<DrawArrow, "id"> & { id?: string }) => string;
+  updateArrow: (id: string, patch: Partial<DrawArrow>) => void;
+  eraseArrow: (id: string) => void;
+
   addLine: (line: DrawLine) => void;
   eraseLine: (index: number) => void;
 
@@ -134,8 +155,12 @@ interface DrawState {
   redo: () => void;
   clearAllLines: () => void;
 
-  // ★外部から「線/テキスト」丸ごと置き換える（chapter再生/読込用）
-  setDrawInstant: (snap: { lines: DrawLine[]; texts: DrawText[] }) => void;
+  // ★外部から「線/矢印/テキスト」丸ごと置き換える
+  setDrawInstant: (snap: {
+    lines: DrawLine[];
+    arrows: DrawArrow[];
+    texts: DrawText[];
+  }) => void;
 }
 
 function uid(prefix: string) {
@@ -145,12 +170,16 @@ function uid(prefix: string) {
 function cloneLines(lines: DrawLine[]): DrawLine[] {
   return lines.map((l) => ({ points: [...l.points], color: l.color, width: l.width }));
 }
+function cloneArrows(arrows: DrawArrow[]): DrawArrow[] {
+  return arrows.map((a) => ({ ...a }));
+}
 function cloneTexts(texts: DrawText[]): DrawText[] {
   return texts.map((t) => ({ ...t }));
 }
 
 export const useDrawStore = create<DrawState>((set, get) => ({
   lines: [],
+  arrows: [],
   texts: [],
 
   penEnabled: false,
@@ -163,7 +192,9 @@ export const useDrawStore = create<DrawState>((set, get) => ({
   textSize: 22,
   selectedTextId: null,
 
-  history: [{ lines: [], texts: [] }],
+  selectedArrowId: null,
+
+  history: [{ lines: [], arrows: [], texts: [] }],
   historyIndex: 0,
 
   setTool: (tool) =>
@@ -171,46 +202,133 @@ export const useDrawStore = create<DrawState>((set, get) => ({
       activeTool: tool,
       penEnabled: tool === "pen",
       eraserEnabled: tool === "eraser",
-      // text/othersはここでは何もしない
     })),
 
   setPenColor: (color) => set({ penColor: color }),
   setPenWidth: (w) => set({ penWidth: w }),
 
   setTextColor: (color) => set({ textColor: color }),
-  setTextSize: (size) => set({ textSize: Math.max(8, Math.min(80, Math.floor(Number(size) || 22))) }),
+  setTextSize: (size) =>
+    set({
+      textSize: Math.max(8, Math.min(80, Math.floor(Number(size) || 22))),
+    }),
   selectText: (id) => set({ selectedTextId: id }),
+  selectArrow: (id) => set({ selectedArrowId: id }),
 
   addLine: (line) => {
-    const { history, historyIndex, texts } = get();
+    const { history, historyIndex, arrows, texts } = get();
     const newLines = [...get().lines, line];
 
     const sliced = history.slice(0, historyIndex + 1);
-    const nextSnap: DrawSnapshot = { lines: cloneLines(newLines), texts: cloneTexts(texts) };
+    const nextSnap: DrawSnapshot = {
+      lines: cloneLines(newLines),
+      arrows: cloneArrows(arrows),
+      texts: cloneTexts(texts),
+    };
 
     set({
       lines: newLines,
       history: [...sliced, nextSnap],
       historyIndex: sliced.length,
+      selectedArrowId: null,
     });
   },
 
   eraseLine: (index) => {
-    const { history, historyIndex, texts } = get();
+    const { history, historyIndex, arrows, texts } = get();
     const newLines = get().lines.filter((_, i) => i !== index);
 
     const sliced = history.slice(0, historyIndex + 1);
-    const nextSnap: DrawSnapshot = { lines: cloneLines(newLines), texts: cloneTexts(texts) };
+    const nextSnap: DrawSnapshot = {
+      lines: cloneLines(newLines),
+      arrows: cloneArrows(arrows),
+      texts: cloneTexts(texts),
+    };
 
     set({
       lines: newLines,
+      history: [...sliced, nextSnap],
+      historyIndex: sliced.length,
+      selectedArrowId: null,
+    });
+  },
+
+  addArrow: (arrow) => {
+    const { history, historyIndex, lines, texts } = get();
+    const id = arrow.id ?? uid("A");
+
+    const newArrows = [
+      ...get().arrows,
+      {
+        id,
+        x1: arrow.x1,
+        y1: arrow.y1,
+        x2: arrow.x2,
+        y2: arrow.y2,
+        cx: arrow.cx,
+        cy: arrow.cy,
+        color: arrow.color,
+        width: arrow.width,
+      },
+    ];
+
+    const sliced = history.slice(0, historyIndex + 1);
+    const nextSnap: DrawSnapshot = {
+      lines: cloneLines(lines),
+      arrows: cloneArrows(newArrows),
+      texts: cloneTexts(texts),
+    };
+
+    set({
+      arrows: newArrows,
+      selectedArrowId: id,
+      selectedTextId: null,
+      history: [...sliced, nextSnap],
+      historyIndex: sliced.length,
+    });
+
+    return id;
+  },
+
+  updateArrow: (id, patch) => {
+    const { history, historyIndex, lines, texts } = get();
+    const newArrows = get().arrows.map((a) => (a.id === id ? { ...a, ...patch } : a));
+
+    const sliced = history.slice(0, historyIndex + 1);
+    const nextSnap: DrawSnapshot = {
+      lines: cloneLines(lines),
+      arrows: cloneArrows(newArrows),
+      texts: cloneTexts(texts),
+    };
+
+    set({
+      arrows: newArrows,
+      history: [...sliced, nextSnap],
+      historyIndex: sliced.length,
+    });
+  },
+
+  eraseArrow: (id) => {
+    const { history, historyIndex, lines, texts } = get();
+    const newArrows = get().arrows.filter((a) => a.id !== id);
+
+    const sliced = history.slice(0, historyIndex + 1);
+    const nextSnap: DrawSnapshot = {
+      lines: cloneLines(lines),
+      arrows: cloneArrows(newArrows),
+      texts: cloneTexts(texts),
+    };
+
+    set({
+      arrows: newArrows,
+      selectedArrowId: get().selectedArrowId === id ? null : get().selectedArrowId,
       history: [...sliced, nextSnap],
       historyIndex: sliced.length,
     });
   },
 
   addText: (t) => {
-    const { history, historyIndex, lines } = get();
+    const { history, historyIndex, lines, arrows } = get();
     const id = t.id ?? uid("T");
 
     const newTexts = [
@@ -222,17 +340,22 @@ export const useDrawStore = create<DrawState>((set, get) => ({
         text: t.text,
         color: t.color,
         fontSize: t.fontSize,
-        boxW: t.boxW ?? 220, // ✅追加：デフォルト幅
-        boxH: (t as any).boxH ?? 60, // ✅追加（初期高さ）
+        boxW: t.boxW ?? 220,
+        boxH: t.boxH ?? 60,
       },
     ];
 
     const sliced = history.slice(0, historyIndex + 1);
-    const nextSnap: DrawSnapshot = { lines: cloneLines(lines), texts: cloneTexts(newTexts) };
+    const nextSnap: DrawSnapshot = {
+      lines: cloneLines(lines),
+      arrows: cloneArrows(arrows),
+      texts: cloneTexts(newTexts),
+    };
 
     set({
       texts: newTexts,
       selectedTextId: id,
+      selectedArrowId: null,
       history: [...sliced, nextSnap],
       historyIndex: sliced.length,
     });
@@ -241,11 +364,15 @@ export const useDrawStore = create<DrawState>((set, get) => ({
   },
 
   updateText: (id, patch) => {
-    const { history, historyIndex, lines } = get();
+    const { history, historyIndex, lines, arrows } = get();
     const newTexts = get().texts.map((t) => (t.id === id ? { ...t, ...patch } : t));
 
     const sliced = history.slice(0, historyIndex + 1);
-    const nextSnap: DrawSnapshot = { lines: cloneLines(lines), texts: cloneTexts(newTexts) };
+    const nextSnap: DrawSnapshot = {
+      lines: cloneLines(lines),
+      arrows: cloneArrows(arrows),
+      texts: cloneTexts(newTexts),
+    };
 
     set({
       texts: newTexts,
@@ -255,11 +382,15 @@ export const useDrawStore = create<DrawState>((set, get) => ({
   },
 
   removeText: (id) => {
-    const { history, historyIndex, lines } = get();
+    const { history, historyIndex, lines, arrows } = get();
     const newTexts = get().texts.filter((t) => t.id !== id);
 
     const sliced = history.slice(0, historyIndex + 1);
-    const nextSnap: DrawSnapshot = { lines: cloneLines(lines), texts: cloneTexts(newTexts) };
+    const nextSnap: DrawSnapshot = {
+      lines: cloneLines(lines),
+      arrows: cloneArrows(arrows),
+      texts: cloneTexts(newTexts),
+    };
 
     set({
       texts: newTexts,
@@ -273,12 +404,14 @@ export const useDrawStore = create<DrawState>((set, get) => ({
     const { history, historyIndex } = get();
     if (historyIndex <= 0) return;
     const newIndex = historyIndex - 1;
-    const snap = history[newIndex] ?? { lines: [], texts: [] };
+    const snap = history[newIndex] ?? { lines: [], arrows: [], texts: [] };
     set({
       historyIndex: newIndex,
       lines: cloneLines(snap.lines),
+      arrows: cloneArrows(snap.arrows),
       texts: cloneTexts(snap.texts),
       selectedTextId: null,
+      selectedArrowId: null,
     });
   },
 
@@ -286,31 +419,43 @@ export const useDrawStore = create<DrawState>((set, get) => ({
     const { history, historyIndex } = get();
     if (historyIndex >= history.length - 1) return;
     const newIndex = historyIndex + 1;
-    const snap = history[newIndex] ?? { lines: [], texts: [] };
+    const snap = history[newIndex] ?? { lines: [], arrows: [], texts: [] };
     set({
       historyIndex: newIndex,
       lines: cloneLines(snap.lines),
+      arrows: cloneArrows(snap.arrows),
       texts: cloneTexts(snap.texts),
       selectedTextId: null,
+      selectedArrowId: null,
     });
   },
 
   clearAllLines: () =>
     set(() => ({
       lines: [],
+      arrows: [],
       texts: [],
-      history: [{ lines: [], texts: [] }],
+      history: [{ lines: [], arrows: [], texts: [] }],
       historyIndex: 0,
       selectedTextId: null,
+      selectedArrowId: null,
     })),
 
   setDrawInstant: (snap) =>
     set(() => ({
       lines: cloneLines(snap.lines ?? []),
+      arrows: cloneArrows(snap.arrows ?? []),
       texts: cloneTexts(snap.texts ?? []),
-      history: [{ lines: cloneLines(snap.lines ?? []), texts: cloneTexts(snap.texts ?? []) }],
+      history: [
+        {
+          lines: cloneLines(snap.lines ?? []),
+          arrows: cloneArrows(snap.arrows ?? []),
+          texts: cloneTexts(snap.texts ?? []),
+        },
+      ],
       historyIndex: 0,
       selectedTextId: null,
+      selectedArrowId: null,
     })),
 }));
 
@@ -321,28 +466,26 @@ export interface ChapterSnapshot {
   players: Player[];
   ball: Ball;
   boardRotation: 0 | 1 | 2 | 3;
-  lines: DrawLine[]; // ★チャプターごとに線も保存
-  texts: DrawText[]; // ✅追加：チャプターごとにテキストも保存
+  lines: DrawLine[];
+  arrows: DrawArrow[];
+  texts: DrawText[];
 }
 
 interface BoardState {
   players: Player[];
   ball: Ball;
-  boardRotation: 0 | 1 | 2 | 3; // 0=横, 1=縦(右), 2=反転, 3=縦(左)
+  boardRotation: 0 | 1 | 2 | 3;
   selectedId: string | null;
   mode3D: Mode3D;
 
-  // ✅ players edit
   addPlayer: (team: TeamId, role?: Role) => { ok: boolean; id?: string; message?: string };
   removePlayer: (id: string) => void;
   setPlayerNumber: (id: string, number: number) => void;
 
-  // chapters
   chapters: ChapterSnapshot[];
-  activeChapterIndex: number; // 0..9
+  activeChapterIndex: number;
   isPlayingChapters: boolean;
 
-  // actions (basic)
   selectPlayer: (id: string | null) => void;
   updatePlayer: (id: string, patch: Partial<Player>) => void;
   updateBall: (patch: Partial<Ball>) => void;
@@ -350,30 +493,27 @@ interface BoardState {
   resetPositions: () => void;
   setMode3D: (mode: Mode3D) => void;
 
-  // actions (chapters)
   saveChapterAtActive: () => void;
   clearChapters: () => void;
   switchChapter: (index: number) => void;
   startPlayChapters: () => void;
   stopPlayChapters: () => void;
 
-  // chapter playback helpers
   applySnapshotInstant: (snap: {
     players: Player[];
     ball: Ball;
     boardRotation: 0 | 1 | 2 | 3;
     lines: DrawLine[];
+    arrows: DrawArrow[];
     texts: DrawText[];
   }) => void;
   setPlayersAndBall: (players: Player[], ball: Ball) => void;
 
-  // export/import
   exportAllToObject: () => ExportDataV1;
   importAllFromObject: (data: unknown) => { ok: boolean; message: string };
 }
 
 function createInitialPlayers(): Player[] {
-  // 左チーム（A）：GK + FP4
   const teamA: Player[] = [
     {
       id: "A-GK",
@@ -390,7 +530,6 @@ function createInitialPlayers(): Player[] {
     { id: "A-FP4", team: "A", role: "FP", x: -4, y: -2, color: "#0ea5e9", number: 9 },
   ];
 
-  // 右チーム（B）：GK + FP4
   const teamB: Player[] = [
     {
       id: "B-GK",
@@ -429,7 +568,8 @@ type ExportDataV1 = {
   };
   draw: {
     lines: DrawLine[];
-    texts?: DrawText[]; // ✅追加（後方互換）
+    arrows?: DrawArrow[];
+    texts?: DrawText[];
   };
 };
 
@@ -483,6 +623,26 @@ function sanitizeLine(l: any): DrawLine | null {
   const width = isNum(l.width) ? l.width : 3;
   return { points: pts, color, width };
 }
+function sanitizeArrow(a: any): DrawArrow | null {
+  if (!isObj(a)) return null;
+  if (!isStr(a.id)) return null;
+  if (!isNum(a.x1) || !isNum(a.y1) || !isNum(a.x2) || !isNum(a.y2)) return null;
+  const color = isStr(a.color) ? a.color : "#111827";
+  const width = isNum(a.width) ? a.width : 3;
+  const cx = isNum(a.cx) ? a.cx : undefined;
+  const cy = isNum(a.cy) ? a.cy : undefined;
+  return {
+    id: a.id,
+    x1: a.x1,
+    y1: a.y1,
+    x2: a.x2,
+    y2: a.y2,
+    cx,
+    cy,
+    color,
+    width,
+  };
+}
 function sanitizeText(t: any): DrawText | null {
   if (!isObj(t)) return null;
   if (!isStr(t.id)) return null;
@@ -490,7 +650,6 @@ function sanitizeText(t: any): DrawText | null {
   if (!isStr(t.text)) return null;
   const color = isStr(t.color) ? t.color : "#111827";
   const fontSize = isNum(t.fontSize) ? t.fontSize : 22;
-  // ✅追加（後方互換）
   const boxW = isNum(t.boxW) ? t.boxW : undefined;
   const boxH = isNum(t.boxH) ? t.boxH : undefined;
   return { id: t.id, x: t.x, y: t.y, text: t.text, color, fontSize, boxW, boxH };
@@ -506,17 +665,20 @@ function sanitizeChapter(c: any): ChapterSnapshot | null {
   const lines = Array.isArray(c.lines)
     ? (c.lines.map(sanitizeLine).filter(Boolean) as DrawLine[])
     : [];
+  const arrows = Array.isArray(c.arrows)
+    ? (c.arrows.map(sanitizeArrow).filter(Boolean) as DrawArrow[])
+    : [];
   const texts = Array.isArray(c.texts)
     ? (c.texts.map(sanitizeText).filter(Boolean) as DrawText[])
     : [];
-  return { id, players, ball, boardRotation, lines, texts };
+  return { id, players, ball, boardRotation, lines, arrows, texts };
 }
 
 /* =========================
    ✅ Players helper（追加機能用）
 ========================= */
 
-function clamp(v: number, min: number, max: number) {
+function clampValue(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
 }
 
@@ -530,31 +692,28 @@ function nextUnusedNumber(players: Player[], team: TeamId): number {
 
 function nextId(players: Player[], team: TeamId, role: Role): string {
   if (role === "GK") {
-    // GKは基本1人想定。既にいたら連番を付ける
     const base = `${team}-GK`;
     if (!players.some((p) => p.id === base)) return base;
     let k = 2;
     while (players.some((p) => p.id === `${base}${k}`)) k++;
     return `${base}${k}`;
   }
-  // FPは FP1, FP2... を埋める
   let i = 1;
   while (players.some((p) => p.id === `${team}-FP${i}`)) i++;
   return `${team}-FP${i}`;
 }
 
 function defaultSpawn(players: Player[], team: TeamId, role: Role): { x: number; y: number } {
-  // 既存の見た目を崩しにくいように、左右の「よくある位置」に置く
   const sameTeam = players.filter((p) => p.team === team);
-  const idx = sameTeam.length; // 0..（追加順）
+  const idx = sameTeam.length;
   const baseX = team === "A" ? -8 : 8;
   const baseYList = [0, 3, -3, 2, -2, 5, -5, 1, -1];
   const y = baseYList[idx % baseYList.length] ?? 0;
   const x = role === "GK" ? (team === "A" ? BOUNDS.xMin + 2 : BOUNDS.xMax - 2) : baseX;
 
   return {
-    x: clamp(x, BOUNDS.xMin + 0.6, BOUNDS.xMax - 0.6),
-    y: clamp(y, BOUNDS.yMin + 0.6, BOUNDS.yMax - 0.6),
+    x: clampValue(x, BOUNDS.xMin + 0.6, BOUNDS.xMax - 0.6),
+    y: clampValue(y, BOUNDS.yMin + 0.6, BOUNDS.yMax - 0.6),
   };
 }
 
@@ -565,7 +724,6 @@ export const useBoardStore = create<BoardState>((set, get) => ({
   selectedId: null,
   mode3D: "camera",
 
-  // ✅ players edit
   addPlayer: (team, role = "FP") => {
     const cur = get().players;
 
@@ -578,7 +736,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
 
     set((s) => ({
       players: [...s.players, p],
-      selectedId: id, // 追加したら選択
+      selectedId: id,
     }));
 
     return { ok: true, id };
@@ -616,7 +774,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
 
   rotateBoard: () =>
     set((_state) => ({
-      boardRotation: (((_state.boardRotation + 1) % 4) as 0 | 1 | 2 | 3),
+      boardRotation: ((_state.boardRotation + 1) % 4) as 0 | 1 | 2 | 3,
     })),
 
   resetPositions: () =>
@@ -626,12 +784,9 @@ export const useBoardStore = create<BoardState>((set, get) => ({
       boardRotation: 0,
       selectedId: null,
       mode3D: "camera",
-      // ★チャプターや線は残す（今までの動作を壊さない）
     }),
 
   setMode3D: (mode) => set({ mode3D: mode }),
-
-  /* ===== Chapters ===== */
 
   saveChapterAtActive: () => {
     const idx = get().activeChapterIndex;
@@ -649,6 +804,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
         color: l.color,
         width: l.width,
       })),
+      arrows: d.arrows.map((a) => ({ ...a })),
       texts: d.texts.map((t) => ({ ...t })),
     };
 
@@ -665,7 +821,6 @@ export const useBoardStore = create<BoardState>((set, get) => ({
   switchChapter: (index) => {
     const idx = Math.max(0, Math.min(9, index));
 
-    // ★「切り替えたら自動保存」：今の章を保存してから移動
     get().saveChapterAtActive();
 
     set({ activeChapterIndex: idx });
@@ -679,10 +834,9 @@ export const useBoardStore = create<BoardState>((set, get) => ({
         ball: found.ball,
         boardRotation: found.boardRotation,
         lines: found.lines,
+        arrows: found.arrows ?? [],
         texts: found.texts ?? [],
       });
-    } else {
-      // 空チャプターなら何もしない（現状維持）
     }
   },
 
@@ -703,6 +857,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
         color: l.color,
         width: l.width,
       })),
+      arrows: (snap.arrows ?? []).map((a) => ({ ...a })),
       texts: (snap.texts ?? []).map((t) => ({ ...t })),
     });
   },
@@ -713,8 +868,6 @@ export const useBoardStore = create<BoardState>((set, get) => ({
       ball: { ...ball },
     });
   },
-
-  /* ===== Export / Import ===== */
 
   exportAllToObject: () => {
     const b = get();
@@ -738,6 +891,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
             color: l.color,
             width: l.width,
           })),
+          arrows: (c.arrows ?? []).map((a) => ({ ...a })),
           texts: (c.texts ?? []).map((t) => ({ ...t })),
         })),
         activeChapterIndex: b.activeChapterIndex,
@@ -748,6 +902,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
           color: l.color,
           width: l.width,
         })),
+        arrows: d.arrows.map((a) => ({ ...a })),
         texts: d.texts.map((t) => ({ ...t })),
       },
     };
@@ -757,15 +912,15 @@ export const useBoardStore = create<BoardState>((set, get) => ({
   importAllFromObject: (raw) => {
     try {
       if (!isObj(raw)) return { ok: false, message: "JSONの形式が不正です。" };
-      if (raw.version !== 1) {
+      if ((raw as any).version !== 1) {
         return { ok: false, message: "未対応のバージョンです。" };
       }
-      if (!isObj(raw.board) || !isObj(raw.draw)) {
+      if (!isObj((raw as any).board) || !isObj((raw as any).draw)) {
         return { ok: false, message: "JSONの中身が不足しています。" };
       }
 
-      const board = raw.board;
-      const draw = raw.draw;
+      const board = (raw as any).board;
+      const draw = (raw as any).draw;
 
       const players = Array.isArray(board.players)
         ? (board.players.map(sanitizePlayer).filter(Boolean) as Player[])
@@ -790,11 +945,14 @@ export const useBoardStore = create<BoardState>((set, get) => ({
         ? (draw.lines.map(sanitizeLine).filter(Boolean) as DrawLine[])
         : [];
 
+      const arrows = Array.isArray((draw as any).arrows)
+        ? (((draw as any).arrows as any[]).map(sanitizeArrow).filter(Boolean) as DrawArrow[])
+        : [];
+
       const texts = Array.isArray((draw as any).texts)
         ? (((draw as any).texts as any[]).map(sanitizeText).filter(Boolean) as DrawText[])
         : [];
 
-      // 反映（今あるUI/機能を壊さないため、必要最小限に上書き）
       set({
         players,
         ball,
@@ -806,10 +964,10 @@ export const useBoardStore = create<BoardState>((set, get) => ({
         isPlayingChapters: false,
       });
 
-      useDrawStore.getState().setDrawInstant({ lines, texts });
+      useDrawStore.getState().setDrawInstant({ lines, arrows, texts });
 
       return { ok: true, message: "読み込みに成功しました。" };
-    } catch (e: any) {
+    } catch {
       return { ok: false, message: "読み込み中にエラーが発生しました。" };
     }
   },
@@ -817,7 +975,6 @@ export const useBoardStore = create<BoardState>((set, get) => ({
 
 /* =========================
    自動保存（localStorage）
-   - 既存UIを崩さず、裏側だけで保存する
 ========================= */
 
 let saveTimer: any = null;
@@ -832,15 +989,13 @@ function scheduleAutoSave() {
     } catch {
       // 失敗してもアプリ動作は止めない
     }
-  }, 250); // 軽いスロットリング
+  }, 250);
 }
 
 try {
-  // 状態変化で自動保存
   useBoardStore.subscribe(() => scheduleAutoSave());
   useDrawStore.subscribe(() => scheduleAutoSave());
 
-  // 起動時：復元
   const raw = localStorage.getItem(LS_KEY);
   if (raw) {
     const parsed = JSON.parse(raw);

@@ -1,4 +1,3 @@
-// src/boards/Board2D.tsx
 import {
   forwardRef,
   useEffect,
@@ -44,13 +43,10 @@ function useLayout() {
   const worldH = 15;
 
   const isMobile = size.w < 768;
-
-  // モバイルでは下部ツールバー（h-16≈64px）ぶんを差し引く
   const toolbarH = isMobile ? 64 : 0;
   const stageW = size.w;
   const stageH = size.h - toolbarH;
 
-  // PCは余白あり、モバイルは余白ゼロ
   const pad = isMobile ? 0 : 40;
   const scale = Math.min(
     (stageW - pad * 2) / worldW,
@@ -60,7 +56,6 @@ function useLayout() {
   const rinkW = worldW * scale;
   const rinkH = worldH * scale;
 
-  // Stage 内でのリンク中心位置
   const centerX = stageW / 2;
   const centerY = stageH / 2;
 
@@ -97,6 +92,74 @@ function makeConverters(worldW: number, worldH: number, scale: number) {
 
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
+}
+
+function makeArrowHeadPoints(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  size: number
+) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.hypot(dx, dy);
+
+  if (len < 0.0001) {
+    return [x2, y2, x2, y2];
+  }
+
+  const ux = dx / len;
+  const uy = dy / len;
+
+  const bx = x2 - ux * size;
+  const by = y2 - uy * size;
+
+  const px = -uy;
+  const py = ux;
+
+  const wing = size * 0.55;
+
+  const lx = bx + px * wing;
+  const ly = by + py * wing;
+  const rx = bx - px * wing;
+  const ry = by - py * wing;
+
+  return [lx, ly, x2, y2, rx, ry];
+}
+
+function quadPoint(
+  x1: number,
+  y1: number,
+  cx: number,
+  cy: number,
+  x2: number,
+  y2: number,
+  t: number
+) {
+  const mt = 1 - t;
+  return {
+    x: mt * mt * x1 + 2 * mt * t * cx + t * t * x2,
+    y: mt * mt * y1 + 2 * mt * t * cy + t * t * y2,
+  };
+}
+
+function makeQuadraticPoints(
+  x1: number,
+  y1: number,
+  cx: number,
+  cy: number,
+  x2: number,
+  y2: number,
+  segments = 24
+) {
+  const pts: number[] = [];
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    const p = quadPoint(x1, y1, cx, cy, x2, y2, t);
+    pts.push(p.x, p.y);
+  }
+  return pts;
 }
 
 function PlayerToken({
@@ -151,7 +214,6 @@ function PlayerToken({
         />
       )}
       <Circle radius={tokenRadius} fill={color} stroke="#0f172a" strokeWidth={2} />
-      {/* 背番号はボード回転に対して常に読みやすい向きに固定 */}
       <Group rotation={-boardRotation * 90}>
         <Text
           text={String(number)}
@@ -189,9 +251,9 @@ const Board2D = forwardRef<Board2DHandle, Board2DProps>(function Board2D(
 
   const { toLocal, toWorld } = makeConverters(worldW, worldH, scale);
 
-  // ✅ DrawStore（Textも含めて使う）
   const {
     lines,
+    arrows,
     texts,
     penEnabled,
     eraserEnabled,
@@ -202,53 +264,75 @@ const Board2D = forwardRef<Board2DHandle, Board2DProps>(function Board2D(
     textColor,
     textSize,
     selectedTextId,
+    selectedArrowId,
 
     addLine,
     eraseLine,
-
+    addArrow,
+    updateArrow,
+    eraseArrow,
     addText,
     updateText,
     removeText,
     selectText,
+    selectArrow,
     setTool,
   } = useDrawStore();
 
   // ===== Text helpers =====
-
-  // wrap後の「実測高さ(px)」を保持（ID => height）
   const textHeightsRef = useRef<Record<string, number>>({});
   const [, forceRerender] = useState(0);
-
-  // リサイズ中はGroupのdragを止める
   const [resizingTextId, setResizingTextId] = useState<string | null>(null);
 
-  // ✅ 選択テキスト削除（Delete / Backspace）+ Escで解除
+  // ===== Arrow draft =====
+  const [currentArrow, setCurrentArrow] = useState<{
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+  } | null>(null);
+
+  // ===== Arrow handle drag =====
+  const [draggingArrowHandle, setDraggingArrowHandle] = useState<
+    null | { id: string; kind: "start" | "end" | "control" }
+  >(null);
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (!selectedTextId) return;
-
       if (e.key === "Escape") {
         selectText(null);
+        selectArrow(null);
         return;
       }
 
-      // view only は削除禁止
       if (readOnly) return;
 
       if (e.key === "Delete" || e.key === "Backspace") {
-        e.preventDefault();
-        removeText(selectedTextId);
-        return;
+        if (selectedTextId) {
+          e.preventDefault();
+          removeText(selectedTextId);
+          return;
+        }
+        if (selectedArrowId) {
+          e.preventDefault();
+          eraseArrow(selectedArrowId);
+        }
       }
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [selectedTextId, removeText, selectText, readOnly]);
+  }, [
+    selectedTextId,
+    selectedArrowId,
+    removeText,
+    eraseArrow,
+    selectText,
+    selectArrow,
+    readOnly,
+  ]);
 
-  // ✅ Ctrl + Wheel で文字サイズ調整（選択中のみ）
   const handleWheel = (e: any) => {
-    if (!selectedTextId) return;
     if (readOnly) return;
 
     const evt = e.evt as WheelEvent;
@@ -256,22 +340,37 @@ const Board2D = forwardRef<Board2DHandle, Board2DProps>(function Board2D(
 
     evt.preventDefault();
 
-    const cur = texts.find((t: any) => t.id === selectedTextId);
-    if (!cur) return;
+    if (selectedTextId) {
+      const cur = texts.find((t: any) => t.id === selectedTextId);
+      if (!cur) return;
 
-    const dir = evt.deltaY > 0 ? -1 : 1;
-    const next = Math.max(
-      10,
-      Math.min(80, Math.round((cur.fontSize ?? 22) + dir * 2))
-    );
+      const dir = evt.deltaY > 0 ? -1 : 1;
+      const next = Math.max(
+        10,
+        Math.min(80, Math.round((cur.fontSize ?? 22) + dir * 2))
+      );
 
-    updateText(selectedTextId, { fontSize: next });
+      updateText(selectedTextId, { fontSize: next });
+      return;
+    }
+
+    if (selectedArrowId) {
+      const cur = arrows.find((a: any) => a.id === selectedArrowId);
+      if (!cur) return;
+
+      const dir = evt.deltaY > 0 ? -1 : 1;
+      const next = Math.max(
+        1,
+        Math.min(16, Math.round((cur.width ?? 3) + dir))
+      );
+
+      updateArrow(selectedArrowId, { width: next });
+    }
   };
 
   const stageRef = useRef<Konva.Stage | null>(null);
   const boardRef = useRef<Konva.Group | null>(null);
 
-  // 外部(App)へ「録画用Canvas」を提供
   useImperativeHandle(
     ref,
     () => ({
@@ -364,7 +463,6 @@ const Board2D = forwardRef<Board2DHandle, Board2DProps>(function Board2D(
   };
 
   const handleMouseDown = (e: any) => {
-    // パン優先（view only でもOK）
     if (!isMobile && spacePressed) {
       handlePanStart(e);
       return;
@@ -375,7 +473,6 @@ const Board2D = forwardRef<Board2DHandle, Board2DProps>(function Board2D(
     if (!local) return;
     if (!isInsideRinkLocal(local)) return;
 
-    // ✅ Textツール：1回置いたら自動でSelectに戻す（view only は追加禁止）
     if (activeTool === "text") {
       if (readOnly) return;
 
@@ -392,11 +489,24 @@ const Board2D = forwardRef<Board2DHandle, Board2DProps>(function Board2D(
       });
 
       selectText(id);
+      selectArrow(null);
       setTool("select");
       return;
     }
 
-    // ペン（view only は描画禁止）
+    if (activeTool === "arrow") {
+      if (readOnly) return;
+
+      const w = toWorld(local.x, local.y);
+      setCurrentArrow({
+        x1: w.x,
+        y1: w.y,
+        x2: w.x,
+        y2: w.y,
+      });
+      return;
+    }
+
     if (readOnly) return;
     if (!penEnabled) return;
 
@@ -409,13 +519,28 @@ const Board2D = forwardRef<Board2DHandle, Board2DProps>(function Board2D(
       handlePanMove(e);
       return;
     }
-    if (readOnly) return;
-    if (!penEnabled || currentLineWorld.length === 0) return;
 
     const stage = e.target.getStage() as Konva.Stage;
     const local = getLocalFromStage(stage);
     if (!local) return;
     if (!isInsideRinkLocal(local)) return;
+
+    if (!readOnly && activeTool === "arrow" && currentArrow) {
+      const w = toWorld(local.x, local.y);
+      setCurrentArrow((prev) =>
+        prev
+          ? {
+              ...prev,
+              x2: w.x,
+              y2: w.y,
+            }
+          : prev
+      );
+      return;
+    }
+
+    if (readOnly) return;
+    if (!penEnabled || currentLineWorld.length === 0) return;
 
     const w = toWorld(local.x, local.y);
     setCurrentLineWorld((prev) => [...prev, w.x, w.y]);
@@ -429,6 +554,30 @@ const Board2D = forwardRef<Board2DHandle, Board2DProps>(function Board2D(
 
     if (readOnly) {
       setCurrentLineWorld([]);
+      setCurrentArrow(null);
+      return;
+    }
+
+    if (activeTool === "arrow" && currentArrow) {
+      const dx = currentArrow.x2 - currentArrow.x1;
+      const dy = currentArrow.y2 - currentArrow.y1;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist >= 0.25) {
+        const id = addArrow({
+          x1: currentArrow.x1,
+          y1: currentArrow.y1,
+          x2: currentArrow.x2,
+          y2: currentArrow.y2,
+          color: penColor,
+          width: penWidth,
+        });
+        selectArrow(id);
+        selectText(null);
+        setTool("select");
+      }
+
+      setCurrentArrow(null);
       return;
     }
 
@@ -495,7 +644,6 @@ const Board2D = forwardRef<Board2DHandle, Board2DProps>(function Board2D(
   const lineW = 0.08 * scale;
   const cornerR = 1.5 * scale;
 
-  // PCだけ緑枠を付ける（スマホは無し）
   const showOuterFrame = !isMobile;
   const outerMargin = 12;
 
@@ -513,16 +661,14 @@ const Board2D = forwardRef<Board2DHandle, Board2DProps>(function Board2D(
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onClick={() => {
-        // ✅ 空白クリックで選択解除（閲覧でもOK）
         selectPlayer(null);
         selectText(null);
+        selectArrow(null);
       }}
       onWheel={handleWheel}
     >
       <Layer>
-        {/* パン用グループ（モバイルでは常に固定） */}
         <Group x={panX} y={panY}>
-          {/* リンク全体（centerX, centerY に配置） */}
           <Group
             ref={(node) => {
               boardRef.current = node as unknown as Konva.Group | null;
@@ -533,7 +679,6 @@ const Board2D = forwardRef<Board2DHandle, Board2DProps>(function Board2D(
             offsetY={rinkH / 2}
             rotation={boardRotation * 90}
           >
-            {/* PCのみ外枠（緑） */}
             {showOuterFrame && (
               <Rect
                 x={-outerMargin}
@@ -545,7 +690,6 @@ const Board2D = forwardRef<Board2DHandle, Board2DProps>(function Board2D(
               />
             )}
 
-            {/* コート本体 */}
             <Rect
               x={0}
               y={0}
@@ -557,14 +701,12 @@ const Board2D = forwardRef<Board2DHandle, Board2DProps>(function Board2D(
               strokeWidth={2}
             />
 
-            {/* センターライン */}
             <Line
               points={[midTop.x, midTop.y, midBot.x, midBot.y]}
               stroke={lineColor}
               strokeWidth={lineW}
             />
 
-            {/* センターサークル */}
             <Circle
               x={center.x}
               y={center.y}
@@ -573,7 +715,6 @@ const Board2D = forwardRef<Board2DHandle, Board2DProps>(function Board2D(
               strokeWidth={lineW}
             />
 
-            {/* ペナルティエリア */}
             {[penaltyCenterLeftPx, penaltyCenterRightPx].map((p, i) => (
               <Group key={i}>
                 <Rect
@@ -594,16 +735,13 @@ const Board2D = forwardRef<Board2DHandle, Board2DProps>(function Board2D(
               </Group>
             ))}
 
-            {/* ペナルティ前のドット */}
             {frontDots.map((d, i) => (
               <Circle key={i} x={d.x} y={d.y} radius={dotR} fill={lineColor} />
             ))}
 
-            {/* PKスポット */}
             <Circle x={pkLeftPx.x} y={pkLeftPx.y} radius={pkR} fill={lineColor} />
             <Circle x={pkRightPx.x} y={pkRightPx.y} radius={pkR} fill={lineColor} />
 
-            {/* ゴール */}
             {[goalLeftPx, goalRightPx].map((g, idx) => (
               <Rect
                 key={idx}
@@ -617,7 +755,259 @@ const Board2D = forwardRef<Board2DHandle, Board2DProps>(function Board2D(
               />
             ))}
 
-            {/* ✅ テキスト（移動/選択/編集/縦横リサイズ/長文対応） */}
+            {/* Arrow */}
+            {arrows.map((a) => {
+              const p1 = toLocal(a.x1, a.y1);
+              const p2 = toLocal(a.x2, a.y2);
+
+              const hasCurve =
+                typeof a.cx === "number" && typeof a.cy === "number";
+
+              const cp = hasCurve
+                ? toLocal(a.cx!, a.cy!)
+                : {
+                    x: (p1.x + p2.x) / 2,
+                    y: (p1.y + p2.y) / 2,
+                  };
+
+              const isSel = a.id === selectedArrowId;
+
+              const bodyPoints = hasCurve
+                ? makeQuadraticPoints(
+                    p1.x,
+                    p1.y,
+                    cp.x,
+                    cp.y,
+                    p2.x,
+                    p2.y,
+                    24
+                  )
+                : [p1.x, p1.y, p2.x, p2.y];
+
+              const headBase = hasCurve
+                ? quadPoint(p1.x, p1.y, cp.x, cp.y, p2.x, p2.y, 0.9)
+                : p1;
+
+              const headSize = Math.max(10, a.width * 4.5);
+              const headPoints = makeArrowHeadPoints(
+                headBase.x,
+                headBase.y,
+                p2.x,
+                p2.y,
+                headSize
+              );
+
+              const curveMid = hasCurve
+                ? quadPoint(p1.x, p1.y, cp.x, cp.y, p2.x, p2.y, 0.5)
+                : {
+                    x: (p1.x + p2.x) / 2,
+                    y: (p1.y + p2.y) / 2,
+                  };
+
+              return (
+                <Group
+                  key={a.id}
+                  draggable={
+                    !readOnly &&
+                    activeTool === "select" &&
+                    draggingArrowHandle?.id !== a.id &&
+                    !spacePressed
+                  }
+                  onMouseDown={(e) => {
+                    e.cancelBubble = true;
+
+                    if (readOnly) {
+                      selectArrow(a.id);
+                      selectText(null);
+                      return;
+                    }
+
+                    if (eraserEnabled) {
+                      eraseArrow(a.id);
+                      return;
+                    }
+
+                    selectArrow(a.id);
+                    selectText(null);
+                  }}
+                  onClick={(e) => {
+                    e.cancelBubble = true;
+                    selectArrow(a.id);
+                    selectText(null);
+                  }}
+                  onDragStart={(e) => {
+                    if (readOnly) return;
+                    e.cancelBubble = true;
+                    selectArrow(a.id);
+                    selectText(null);
+                  }}
+                  onDragEnd={(e) => {
+                    if (readOnly) return;
+
+                    e.cancelBubble = true;
+
+                    const dxLocal = e.target.x();
+                    const dyLocal = e.target.y();
+
+                    const dxWorld = dxLocal / scale;
+                    const dyWorld = -dyLocal / scale;
+
+                    updateArrow(a.id, {
+                      x1: a.x1 + dxWorld,
+                      y1: a.y1 + dyWorld,
+                      x2: a.x2 + dxWorld,
+                      y2: a.y2 + dyWorld,
+                      cx:
+                        typeof a.cx === "number"
+                          ? a.cx + dxWorld
+                          : undefined,
+                      cy:
+                        typeof a.cy === "number"
+                          ? a.cy + dyWorld
+                          : undefined,
+                    });
+
+                    e.target.position({ x: 0, y: 0 });
+                  }}
+                >
+                  <Line
+                    points={bodyPoints}
+                    stroke={a.color}
+                    strokeWidth={a.width}
+                    lineCap="round"
+                    lineJoin="round"
+                    hitStrokeWidth={Math.max(18, a.width + 12)}
+                  />
+                  <Line
+                    points={headPoints}
+                    stroke={a.color}
+                    strokeWidth={a.width}
+                    lineCap="round"
+                    lineJoin="round"
+                    hitStrokeWidth={Math.max(18, a.width + 12)}
+                  />
+
+                  {isSel && (
+                    <>
+                      <Circle
+                        x={p1.x}
+                        y={p1.y}
+                        radius={6}
+                        fill="#10b981"
+                        draggable={!readOnly}
+                        onDragStart={(e) => {
+                          if (readOnly) return;
+                          e.cancelBubble = true;
+                          setDraggingArrowHandle({ id: a.id, kind: "start" });
+                        }}
+                        onDragMove={(e) => {
+                          if (readOnly) return;
+                          e.cancelBubble = true;
+                          const w = toWorld(e.target.x(), e.target.y());
+                          updateArrow(a.id, { x1: w.x, y1: w.y });
+                        }}
+                        onDragEnd={(e) => {
+                          if (readOnly) return;
+                          e.cancelBubble = true;
+                          setDraggingArrowHandle(null);
+                        }}
+                      />
+
+                      <Circle
+                        x={p2.x}
+                        y={p2.y}
+                        radius={6}
+                        fill="#10b981"
+                        draggable={!readOnly}
+                        onDragStart={(e) => {
+                          if (readOnly) return;
+                          e.cancelBubble = true;
+                          setDraggingArrowHandle({ id: a.id, kind: "end" });
+                        }}
+                        onDragMove={(e) => {
+                          if (readOnly) return;
+                          e.cancelBubble = true;
+                          const w = toWorld(e.target.x(), e.target.y());
+                          updateArrow(a.id, { x2: w.x, y2: w.y });
+                        }}
+                        onDragEnd={(e) => {
+                          if (readOnly) return;
+                          e.cancelBubble = true;
+                          setDraggingArrowHandle(null);
+                        }}
+                      />
+
+                      <Circle
+                        x={curveMid.x}
+                        y={curveMid.y}
+                        radius={5}
+                        fill="#38bdf8"
+                        draggable={!readOnly}
+                        onDragStart={(e) => {
+                          if (readOnly) return;
+                          e.cancelBubble = true;
+                          setDraggingArrowHandle({
+                            id: a.id,
+                            kind: "control",
+                          });
+                        }}
+                        onDragMove={(e) => {
+                          if (readOnly) return;
+                          e.cancelBubble = true;
+
+                          const mw = toWorld(e.target.x(), e.target.y());
+
+                          const newCx = 2 * mw.x - 0.5 * (a.x1 + a.x2);
+                          const newCy = 2 * mw.y - 0.5 * (a.y1 + a.y2);
+
+                          updateArrow(a.id, { cx: newCx, cy: newCy });
+                        }}
+                        onDragEnd={(e) => {
+                          if (readOnly) return;
+                          e.cancelBubble = true;
+                          setDraggingArrowHandle(null);
+                        }}
+                      />
+                    </>
+                  )}
+                </Group>
+              );
+            })}
+
+            {/* Arrow draft */}
+            {!readOnly && currentArrow && (() => {
+              const p1 = toLocal(currentArrow.x1, currentArrow.y1);
+              const p2 = toLocal(currentArrow.x2, currentArrow.y2);
+              const headSize = Math.max(10, penWidth * 4.5);
+              const headPoints = makeArrowHeadPoints(
+                p1.x,
+                p1.y,
+                p2.x,
+                p2.y,
+                headSize
+              );
+
+              return (
+                <Group>
+                  <Line
+                    points={[p1.x, p1.y, p2.x, p2.y]}
+                    stroke={penColor}
+                    strokeWidth={penWidth}
+                    lineCap="round"
+                    lineJoin="round"
+                  />
+                  <Line
+                    points={headPoints}
+                    stroke={penColor}
+                    strokeWidth={penWidth}
+                    lineCap="round"
+                    lineJoin="round"
+                  />
+                </Group>
+              );
+            })()}
+
+            {/* Text */}
             {texts.map((t: any) => {
               const p = toLocal(t.x, t.y);
               const isSel = t.id === selectedTextId;
@@ -645,20 +1035,23 @@ const Board2D = forwardRef<Board2DHandle, Board2DProps>(function Board2D(
                     !readOnly &&
                     !spacePressed &&
                     activeTool === "select" &&
-                    resizingTextId !== t.id
+                    resizingTextId !== t.id &&
+                    !draggingArrowHandle
                   }
-                  // ✅ ここが重要：Group側でイベントを止めて選択する（Stageの選択解除を防ぐ）
                   onMouseDown={(e) => {
                     e.cancelBubble = true;
                     selectText(t.id);
+                    selectArrow(null);
                   }}
                   onClick={(e) => {
                     e.cancelBubble = true;
                     selectText(t.id);
+                    selectArrow(null);
                   }}
                   onDragStart={(e) => {
                     e.cancelBubble = true;
                     selectText(t.id);
+                    selectArrow(null);
                   }}
                   onDragEnd={(e) => {
                     if (readOnly) return;
@@ -679,11 +1072,11 @@ const Board2D = forwardRef<Board2DHandle, Board2DProps>(function Board2D(
                     padding={6}
                     listening
                     onDblClick={(e) => {
-                      // view only は編集禁止
                       if (readOnly) return;
 
                       e.cancelBubble = true;
                       selectText(t.id);
+                      selectArrow(null);
 
                       const next = window.prompt("Edit text", t.text);
                       if (next === null) return;
@@ -704,7 +1097,6 @@ const Board2D = forwardRef<Board2DHandle, Board2DProps>(function Board2D(
                       if (prev !== h) {
                         textHeightsRef.current[t.id] = h;
 
-                        // 実測高さの方が大きいなら boxH を押し上げ（見切れ防止）
                         if (!readOnly) {
                           const curBoxH = t.boxH ?? 60;
                           if (h > curBoxH + 1) {
@@ -712,7 +1104,6 @@ const Board2D = forwardRef<Board2DHandle, Board2DProps>(function Board2D(
                           }
                         }
 
-                        // 枠/ハンドル位置の更新用
                         forceRerender((x) => x + 1);
                       }
                     }}
@@ -720,7 +1111,6 @@ const Board2D = forwardRef<Board2DHandle, Board2DProps>(function Board2D(
 
                   {isSel && (
                     <>
-                      {/* 枠 */}
                       <Rect
                         x={0}
                         y={0}
@@ -733,7 +1123,6 @@ const Board2D = forwardRef<Board2DHandle, Board2DProps>(function Board2D(
                         listening={false}
                       />
 
-                      {/* 右下ハンドル（縦横リサイズ） */}
                       <Rect
                         x={widthPx - handleSize}
                         y={heightPx - handleSize}
@@ -753,8 +1142,8 @@ const Board2D = forwardRef<Board2DHandle, Board2DProps>(function Board2D(
 
                           e.cancelBubble = true;
 
-                          const nx = e.target.x() + handleSize; // 新しい幅
-                          const ny = e.target.y() + handleSize; // 新しい高さ
+                          const nx = e.target.x() + handleSize;
+                          const ny = e.target.y() + handleSize;
 
                           const newW = Math.max(minW, Math.min(maxW, nx));
                           const newH = Math.max(minH, Math.min(maxH, ny));
@@ -767,8 +1156,10 @@ const Board2D = forwardRef<Board2DHandle, Board2DProps>(function Board2D(
                           e.cancelBubble = true;
                           setResizingTextId(null);
 
-                          // ハンドル自身は次描画で戻るが、念のため
-                          e.target.position({ x: widthPx - handleSize, y: heightPx - handleSize });
+                          e.target.position({
+                            x: widthPx - handleSize,
+                            y: heightPx - handleSize,
+                          });
                         }}
                       />
                     </>

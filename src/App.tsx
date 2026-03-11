@@ -299,7 +299,7 @@ function Sidebar({
           <span>Anime</span>
         </button>
 
-        <ToolButton id="arrow" label="Arrow" icon="➡️" disabled />
+        <ToolButton id="arrow" label="Arrow" icon="➡️" disabled={readOnly} />
         <ToolButton id="text" label="Text" icon="🅣" disabled={readOnly} />
       </div>
 
@@ -924,6 +924,7 @@ function ChapterPlayer({ playbackSpeed }: { playbackSpeed: PlaybackSpeed }) {
         ball: from.ball,
         boardRotation: from.boardRotation,
         lines: from.lines,
+        arrows: from.arrows ?? [],
         texts: from.texts ?? [],
       });
 
@@ -972,6 +973,7 @@ function ChapterPlayer({ playbackSpeed }: { playbackSpeed: PlaybackSpeed }) {
         ball: to.ball,
         boardRotation: to.boardRotation,
         lines: to.lines,
+        arrows: from.arrows ?? [],
         texts: to.texts ?? [],
       });
 
@@ -986,6 +988,7 @@ function ChapterPlayer({ playbackSpeed }: { playbackSpeed: PlaybackSpeed }) {
             ball: seq[0].ball,
             boardRotation: seq[0].boardRotation,
             lines: seq[0].lines,
+            arrows: seq[0].arrows ?? [],
             texts: seq[0].texts ?? [],
           });
           await sleep(800);
