@@ -573,7 +573,7 @@ type ExportDataV1 = {
   };
 };
 
-const LS_KEY = "rinkboard_export_v1";
+
 
 function isObj(v: unknown): v is Record<string, any> {
   return !!v && typeof v === "object";
