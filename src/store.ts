@@ -973,34 +973,3 @@ export const useBoardStore = create<BoardState>((set, get) => ({
   },
 }));
 
-/* =========================
-   自動保存（localStorage）
-========================= */
-
-let saveTimer: any = null;
-
-function scheduleAutoSave() {
-  if (saveTimer) return;
-  saveTimer = setTimeout(() => {
-    saveTimer = null;
-    try {
-      const data = useBoardStore.getState().exportAllToObject();
-      localStorage.setItem(LS_KEY, JSON.stringify(data));
-    } catch {
-      // 失敗してもアプリ動作は止めない
-    }
-  }, 250);
-}
-
-try {
-  useBoardStore.subscribe(() => scheduleAutoSave());
-  useDrawStore.subscribe(() => scheduleAutoSave());
-
-  const raw = localStorage.getItem(LS_KEY);
-  if (raw) {
-    const parsed = JSON.parse(raw);
-    useBoardStore.getState().importAllFromObject(parsed);
-  }
-} catch {
-  // localStorageが使えない環境でも落とさない
-}

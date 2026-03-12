@@ -1,4 +1,3 @@
-// src/App.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import Board2D from "./boards/Board2D";
 import Board3D from "./boards/Board3D";
@@ -111,7 +110,6 @@ function Header({
 
   return (
     <header className="flex items-center justify-between px-4 py-1 bg-slate-900/95 border-b border-slate-800">
-      {/* 左：ロゴ */}
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center font-bold text-slate-900">
           R
@@ -122,7 +120,6 @@ function Header({
         </div>
       </div>
 
-      {/* 中央：ビュー切り替え + 3D操作モード */}
       <div className="flex flex-col items-center gap-1">
         <div className="bg-slate-800/80 border border-slate-700 rounded-full p-1 flex items-center gap-1">
           <button
@@ -155,7 +152,7 @@ function Header({
                 setMode3D("piece");
               }}
               disabled={readOnly}
-              title={readOnly ? "View only" : undefined}
+              title={readOnly ? t(lang, "common.viewOnly") : undefined}
             >
               {t(lang, "header.mode3d.pieces")}
             </button>
@@ -163,11 +160,10 @@ function Header({
         )}
       </div>
 
-      {/* 右：アクション系 */}
       <div className="flex items-center gap-2">
         {readOnly && (
           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium bg-amber-500/15 text-amber-200 border border-amber-400/25">
-            🔒 View only
+            🔒 {t(lang, "common.viewOnly")}
           </span>
         )}
 
@@ -182,6 +178,7 @@ function Header({
           className={`${buttonBase} ${editDisabled ? buttonDisabled : buttonEnabled}`}
           onClick={undo}
           disabled={editDisabled}
+          title={editDisabled ? t(lang, "common.viewOnly") : undefined}
         >
           {t(lang, "header.btn.undo")}
         </button>
@@ -190,6 +187,7 @@ function Header({
           className={`${buttonBase} ${editDisabled ? buttonDisabled : buttonEnabled}`}
           onClick={redo}
           disabled={editDisabled}
+          title={editDisabled ? t(lang, "common.viewOnly") : undefined}
         >
           {t(lang, "header.btn.redo")}
         </button>
@@ -198,6 +196,7 @@ function Header({
           className={`${buttonBase} ${editDisabled ? buttonDisabled : buttonEnabled}`}
           onClick={rotateBoard}
           disabled={editDisabled}
+          title={editDisabled ? t(lang, "common.viewOnly") : undefined}
         >
           {t(lang, "header.btn.rotate")}
         </button>
@@ -209,6 +208,7 @@ function Header({
             resetPositions();
           }}
           disabled={editDisabled}
+          title={editDisabled ? t(lang, "common.viewOnly") : undefined}
         >
           {t(lang, "header.btn.reset")}
         </button>
@@ -217,7 +217,7 @@ function Header({
           className={`${buttonBase} ${editDisabled ? buttonDisabled : buttonEnabled}`}
           onClick={onOpenPlayers}
           disabled={editDisabled}
-          title={readOnly ? "View only" : "Add / Remove / Number"}
+          title={editDisabled ? t(lang, "common.viewOnly") : t(lang, "header.btn.players")}
         >
           {t(lang, "header.btn.players")}
         </button>
@@ -237,9 +237,11 @@ function Header({
 function Sidebar({
   onOpenAnimation,
   readOnly,
+  lang,
 }: {
   onOpenAnimation: () => void;
   readOnly: boolean;
+  lang: "ja" | "en";
 }) {
   const { activeTool, setTool, penColor, penWidth, setPenColor, setPenWidth } = useDrawStore();
 
@@ -265,7 +267,7 @@ function Sidebar({
   }) => {
     if (disabled) {
       return (
-        <div className={disabledItem} title="View only">
+        <div className={disabledItem} title={t(lang, "common.viewOnly")}>
           <span className="text-lg">{icon}</span>
           <span>{label}</span>
         </div>
@@ -286,26 +288,26 @@ function Sidebar({
   return (
     <aside className="w-20 bg-slate-900/95 border-r border-slate-800 flex flex-col items-stretch pt-3 pb-4 gap-2">
       <div className="flex-1 flex flex-col gap-1">
-        <ToolButton id="select" label="Select" icon="🖱" />
-        <ToolButton id="pen" label="Pen" icon="✏️" disabled={readOnly} />
-        <ToolButton id="eraser" label="Eraser" icon="🧽" disabled={readOnly} />
+        <ToolButton id="select" label={t(lang, "tool.select")} icon="🖱" />
+        <ToolButton id="pen" label={t(lang, "tool.pen")} icon="✏️" disabled={readOnly} />
+        <ToolButton id="eraser" label={t(lang, "tool.eraser")} icon="🧽" disabled={readOnly} />
 
         <button
           className="mt-2 w-full flex flex-col items-center gap-1 px-2 py-3 text-[11px] cursor-pointer border-l-2 border-transparent text-slate-300 hover:bg:white/5 hover:border-slate-600 transition"
           onClick={onOpenAnimation}
-          title="Chapters / Animation"
+          title={t(lang, "anim.title")}
         >
           <span className="text-lg">🎞</span>
-          <span>Anime</span>
+          <span>{t(lang, "sidebar.anime")}</span>
         </button>
 
-        <ToolButton id="arrow" label="Arrow" icon="➡️" disabled={readOnly} />
-        <ToolButton id="text" label="Text" icon="🅣" disabled={readOnly} />
+        <ToolButton id="arrow" label={t(lang, "tool.arrow")} icon="➡️" disabled={readOnly} />
+        <ToolButton id="text" label={t(lang, "tool.text")} icon="🅣" disabled={readOnly} />
       </div>
 
       <div className="border-t border-slate-700 pt-2 px-2 flex flex-col gap-2">
         <div className="flex flex-col gap-1">
-          <span className="text-[10px] text-slate-400">Pen color</span>
+          <span className="text-[10px] text-slate-400">{t(lang, "sidebar.penColor")}</span>
           <div className="flex gap-1 justify-between">
             {["#111827", "#ef4444", "#22c55e", "#3b82f6", "#f59e0b"].map((c) => (
               <button
@@ -324,7 +326,7 @@ function Sidebar({
           </div>
         </div>
         <div className="flex flex-col gap-1">
-          <span className="text-[10px] text-slate-400">Pen width</span>
+          <span className="text-[10px] text-slate-400">{t(lang, "sidebar.penWidth")}</span>
           <input
             type="range"
             min={1}
@@ -356,6 +358,7 @@ function AnimationPanel({
   onCopyViewLink,
   shareCopied,
   readOnly,
+  lang,
 }: {
   open: boolean;
   onClose: () => void;
@@ -369,6 +372,7 @@ function AnimationPanel({
   onCopyViewLink: () => void;
   shareCopied: ShareCopiedKind;
   readOnly: boolean;
+  lang: "ja" | "en";
 }) {
   const isMobile = useIsMobile();
   const {
@@ -426,10 +430,10 @@ function AnimationPanel({
         blob,
         `rinkboard-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.json`
       );
-      setToast("JSONを書き出しました（ダウンロード）");
+      setToast(t(lang, "anim.toast.exported"));
       setTimeout(() => setToast(null), 2000);
     } catch {
-      setToast("書き出しに失敗しました");
+      setToast(t(lang, "anim.toast.exportFailed"));
       setTimeout(() => setToast(null), 2000);
     }
   };
@@ -443,7 +447,7 @@ function AnimationPanel({
       setToast(res.message);
       setTimeout(() => setToast(null), 2400);
     } catch {
-      setToast("読み込みに失敗しました（JSONが壊れている可能性）");
+      setToast(t(lang, "anim.toast.importFailed"));
       setTimeout(() => setToast(null), 2400);
     }
   };
@@ -472,15 +476,15 @@ function AnimationPanel({
             <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800">
               <div className="flex items-center gap-2">
                 <div className="w-10 h-1.5 rounded-full bg-slate-600/70" />
-                <span className="text-sm text-slate-100 font-semibold">Animation / Chapters</span>
-                <span className="text-[11px] text-slate-400">（最大10）</span>
+                <span className="text-sm text-slate-100 font-semibold">{t(lang, "anim.title")}</span>
+                <span className="text-[11px] text-slate-400">{t(lang, "anim.max10")}</span>
                 {readOnly && (
                   <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-200 border border-amber-400/25">
-                    🔒 View only
+                    🔒 {t(lang, "common.viewOnly")}
                   </span>
                 )}
               </div>
-              <button className="text-slate-300 hover:text-white text-sm" onClick={onClose} title="Close">
+              <button className="text-slate-300 hover:text-white text-sm" onClick={onClose} title={t(lang, "common.close")}>
                 ✕
               </button>
             </div>
@@ -494,10 +498,12 @@ function AnimationPanel({
 
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-300">Chapters</span>
+                  <span className="text-xs text-slate-300">{t(lang, "anim.chapters")}</span>
                   <span className="text-[11px] text-slate-500">
-                    Active: {activeChapterIndex + 1}
-                    {slots[activeChapterIndex] ? " (saved)" : " (empty)"}
+                    {t(lang, "anim.active")}: {activeChapterIndex + 1}{" "}
+                    {slots[activeChapterIndex]
+                      ? t(lang, "anim.saved")
+                      : t(lang, "anim.empty")}
                   </span>
                 </div>
 
@@ -507,16 +513,16 @@ function AnimationPanel({
                     onClick={saveChapterAtActive}
                     disabled={readOnly}
                   >
-                    Save
+                    {t(lang, "anim.btn.save")}
                   </button>
 
                   {!isPlayingChapters ? (
                     <button className={`${baseBtn} ${baseBtnEnabled}`} onClick={startPlayChapters}>
-                      ▶ Play
+                      {t(lang, "anim.btn.play")}
                     </button>
                   ) : (
                     <button className={`${baseBtn} ${baseBtnEnabled}`} onClick={stopPlayChapters}>
-                      ■ Stop
+                      {t(lang, "anim.btn.stop")}
                     </button>
                   )}
 
@@ -525,14 +531,14 @@ function AnimationPanel({
                     onClick={clearChapters}
                     disabled={readOnly}
                   >
-                    Clear
+                    {t(lang, "anim.btn.clear")}
                   </button>
                 </div>
               </div>
 
               <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-300">Speed</span>
+                  <span className="text-xs text-slate-300">{t(lang, "anim.speed")}</span>
                   <span className="text-[11px] text-slate-500">{playbackSpeed}x</span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -557,10 +563,10 @@ function AnimationPanel({
                       className={slotBtn(i === activeChapterIndex, saved, readOnly)}
                       title={
                         readOnly
-                          ? "View only"
+                          ? t(lang, "common.viewOnly")
                           : saved
-                          ? `Saved: Chapter ${i + 1}`
-                          : `Empty: Chapter ${i + 1}`
+                          ? `${t(lang, "anim.saved")} ${i + 1}`
+                          : `${t(lang, "anim.empty")} ${i + 1}`
                       }
                       onClick={() => {
                         if (readOnly) return;
@@ -577,28 +583,27 @@ function AnimationPanel({
               <div className="mt-4 flex items-center gap-2 flex-wrap">
                 {!recording ? (
                   <button className={`${baseBtn} ${baseBtnEnabled}`} onClick={onStartRecord}>
-                    ● Record ({recordExt.toUpperCase()})
+                    {t(lang, "anim.record")} ({recordExt.toUpperCase()})
                   </button>
                 ) : (
                   <button className={`${baseBtn} ${baseBtnEnabled}`} onClick={onStopRecord}>
-                    ■ Stop & Save
+                    {t(lang, "anim.stopSave")}
                   </button>
                 )}
                 <span className="text-[11px] text-slate-500">
-                  ※MP4はブラウザ対応次第。非対応環境はWebMで保存されます。
+                  {t(lang, "anim.recordNote")}
                 </span>
               </div>
 
-              {/* JSON Export/Import + Share */}
               <div className="mt-3 flex items-center gap-2 flex-wrap">
                 <button className={`${baseBtn} ${baseBtnEnabled}`} onClick={downloadJSON}>
-                  ⬇ Export JSON
+                  {t(lang, "anim.exportJson")}
                 </button>
 
                 <label
                   className={`${baseBtn} ${readOnly ? baseBtnDisabled : baseBtnEnabled} cursor-pointer`}
                 >
-                  ⬆ Import JSON
+                  {t(lang, "anim.importJson")}
                   <input
                     type="file"
                     accept="application/json"
@@ -609,33 +614,33 @@ function AnimationPanel({
                 </label>
 
                 <button className={`${baseBtn} ${baseBtnEnabled}`} onClick={onCopyEditLink}>
-                  🔗 Copy Edit Link
+                  {t(lang, "share.copyEdit")}
                 </button>
 
                 <button className={`${baseBtn} ${baseBtnEnabled}`} onClick={onCopyViewLink}>
-                  🔒 Copy View Link
+                  {t(lang, "share.copyView")}
                 </button>
 
                 {shareCopied === "edit" && (
-                  <span className="text-[11px] text-emerald-200">Copied edit link!</span>
+                  <span className="text-[11px] text-emerald-200">{t(lang, "share.copiedEdit")}</span>
                 )}
                 {shareCopied === "view" && (
-                  <span className="text-[11px] text-emerald-200">Copied view-only link!</span>
+                  <span className="text-[11px] text-emerald-200">{t(lang, "share.copiedView")}</span>
                 )}
 
                 <span className="text-[11px] text-slate-500">
-                  （自動保存も有効：ブラウザに保存されます）
+                  {t(lang, "anim.autosaveNote")}
                 </span>
               </div>
 
               <div className="mt-3 text-[11px] text-slate-400 leading-relaxed">
-                ・3Dでも「駒/ボールの動き」は再生できます（線は2D専用なので3Dでは表示されません）
+                {t(lang, "anim.note1")}
                 <br />
-                ・閉じるとリンクが全面表示になります
+                {t(lang, "anim.note2")}
                 {readOnly && (
                   <>
                     <br />
-                    ・閲覧モードでは Save / Clear / Import / chapter切替 は無効です
+                    {t(lang, "anim.noteReadOnly")}
                   </>
                 )}
               </div>
@@ -647,17 +652,16 @@ function AnimationPanel({
   );
 }
 
-/* =========================
-   ✅ Players Panel（追加）
-========================= */
 function PlayersPanel({
   open,
   onClose,
   readOnly,
+  lang,
 }: {
   open: boolean;
   onClose: () => void;
   readOnly: boolean;
+  lang: "ja" | "en";
 }) {
   const isMobile = useIsMobile();
   const { players, selectedId, selectPlayer, addPlayer, removePlayer, setPlayerNumber } = useBoardStore();
@@ -706,15 +710,15 @@ function PlayersPanel({
             <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800">
               <div className="flex items-center gap-2">
                 <div className="w-10 h-1.5 rounded-full bg-slate-600/70" />
-                <span className="text-sm text-slate-100 font-semibold">Players</span>
-                <span className="text-[11px] text-slate-400">（追加 / 削除 / 背番号）</span>
+                <span className="text-sm text-slate-100 font-semibold">{t(lang, "players.title")}</span>
+                <span className="text-[11px] text-slate-400">{t(lang, "players.sub")}</span>
                 {readOnly && (
                   <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-200 border border-amber-400/25">
-                    🔒 View only
+                    🔒 {t(lang, "common.viewOnly")}
                   </span>
                 )}
               </div>
-              <button className="text-slate-300 hover:text-white text-sm" onClick={onClose} title="Close">
+              <button className="text-slate-300 hover:text-white text-sm" onClick={onClose} title={t(lang, "common.close")}>
                 ✕
               </button>
             </div>
@@ -722,13 +726,13 @@ function PlayersPanel({
             <div className={["px-4 py-3 overflow-auto", maxH].join(" ")}>
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className="text-[12px] text-slate-200">
-                  Selected:{" "}
+                  {t(lang, "players.selected")}{" "}
                   {selected ? (
                     <span className="font-semibold">
                       {selected.id}（Team {selected.team} / {selected.role}）
                     </span>
                   ) : (
-                    <span className="text-slate-400">none</span>
+                    <span className="text-slate-400">{t(lang, "players.none")}</span>
                   )}
                 </div>
 
@@ -741,9 +745,9 @@ function PlayersPanel({
                         setAddPicking(true);
                       }}
                       disabled={readOnly}
-                      title={readOnly ? "View only" : "Add player"}
+                      title={readOnly ? t(lang, "common.viewOnly") : t(lang, "players.btn.add")}
                     >
-                      + Add
+                      {t(lang, "players.btn.add")}
                     </button>
                   ) : (
                     <button
@@ -753,9 +757,9 @@ function PlayersPanel({
                         setAddPicking(false);
                       }}
                       disabled={readOnly}
-                      title="Cancel"
+                      title={t(lang, "players.btn.cancel")}
                     >
-                      Cancel
+                      {t(lang, "players.btn.cancel")}
                     </button>
                   )}
 
@@ -766,9 +770,9 @@ function PlayersPanel({
                       if (readOnly || !selected) return;
                       removePlayer(selected.id);
                     }}
-                    title={readOnly ? "View only" : "Remove selected"}
+                    title={readOnly ? t(lang, "common.viewOnly") : t(lang, "players.btn.delete")}
                   >
-                    Delete
+                    {t(lang, "players.btn.delete")}
                   </button>
                 </div>
               </div>
@@ -776,10 +780,10 @@ function PlayersPanel({
               {addPicking && (
                 <div className="mt-3 p-3 rounded-lg border border-white/10 bg-white/5">
                   <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div className="text-xs text-slate-300">Add player: teamを選んでください</div>
+                    <div className="text-xs text-slate-300">{t(lang, "players.addPrompt")}</div>
 
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-slate-400">Role</span>
+                      <span className="text-[11px] text-slate-400">{t(lang, "players.role")}</span>
                       <select
                         className={`text-xs bg-slate-900 border border-white/15 rounded px-2 py-1 text-slate-100 ${
                           readOnly ? "opacity-40 cursor-not-allowed" : ""
@@ -807,7 +811,7 @@ function PlayersPanel({
                       }}
                       disabled={readOnly}
                     >
-                      Team A
+                      {t(lang, "players.teamA")}
                     </button>
                     <button
                       className={teamBtn("B", readOnly)}
@@ -818,20 +822,20 @@ function PlayersPanel({
                       }}
                       disabled={readOnly}
                     >
-                      Team B
+                      {t(lang, "players.teamB")}
                     </button>
                   </div>
 
                   <div className="mt-2 text-[11px] text-slate-400 leading-relaxed">
-                    ・背番号は「チーム内で未使用の最小番号」を自動で付与します
+                    {t(lang, "players.addNote1")}
                     <br />
-                    ・追加した駒は自動で選択されます
+                    {t(lang, "players.addNote2")}
                   </div>
                 </div>
               )}
 
               <div className="mt-4 flex items-center gap-3 flex-wrap">
-                <div className="text-xs text-slate-300">背番号</div>
+                <div className="text-xs text-slate-300">{t(lang, "players.number")}</div>
                 <input
                   type="number"
                   min={0}
@@ -844,11 +848,11 @@ function PlayersPanel({
                   }}
                   className="w-24 text-xs bg-slate-900 border border-white/15 rounded px-2 py-1 text-slate-100 disabled:opacity-50"
                 />
-                <span className="text-[11px] text-slate-500">（選択中の駒だけ変更できます）</span>
+                <span className="text-[11px] text-slate-500">{t(lang, "players.numberHelp")}</span>
               </div>
 
               <div className="mt-4">
-                <div className="text-[11px] text-slate-400 mb-2">Players list</div>
+                <div className="text-[11px] text-slate-400 mb-2">{t(lang, "players.list")}</div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {players.map((p) => {
                     const active = p.id === selectedId;
@@ -875,9 +879,9 @@ function PlayersPanel({
               </div>
 
               <div className="mt-3 text-[11px] text-slate-500 leading-relaxed">
-                ・削除してもチャプターや線は消えません（既存仕様を維持）
+                {t(lang, "players.footer1")}
                 <br />
-                ・再生中（Play中）に追加/削除をすると意図とズレる可能性があるので、基本は停止中推奨
+                {t(lang, "players.footer2")}
               </div>
             </div>
           </div>
@@ -973,7 +977,7 @@ function ChapterPlayer({ playbackSpeed }: { playbackSpeed: PlaybackSpeed }) {
         ball: to.ball,
         boardRotation: to.boardRotation,
         lines: to.lines,
-        arrows: from.arrows ?? [],
+        arrows: to.arrows ?? [],
         texts: to.texts ?? [],
       });
 
@@ -1176,7 +1180,11 @@ export default function App() {
       <ChapterPlayer playbackSpeed={playbackSpeed} />
 
       <div className="flex flex-1 min-h-0">
-        <Sidebar onOpenAnimation={() => setAnimOpen(true)} readOnly={readOnly} />
+        <Sidebar
+          onOpenAnimation={() => setAnimOpen(true)}
+          readOnly={readOnly}
+          lang={lang}
+        />
         <main ref={mainRef} className="flex-1 min-h-0 min-w-0 bg-slate-900 relative">
           {isPitch ? (
             <PitchPage
@@ -1213,12 +1221,14 @@ export default function App() {
         onCopyViewLink={copyViewLink}
         shareCopied={shareCopied}
         readOnly={readOnly}
+        lang={lang}
       />
 
       <PlayersPanel
         open={playersOpen}
         onClose={() => setPlayersOpen(false)}
         readOnly={readOnly}
+        lang={lang}
       />
     </div>
   );

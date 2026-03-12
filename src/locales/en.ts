@@ -70,12 +70,26 @@ const en = {
   "players.footer1": "• Deleting a player does not delete chapters or lines (keeps current behavior).",
   "players.footer2": "• Adding/removing during playback may cause mismatch—recommended while stopped.",
 
+  // Read only / shared UI
+  "common.viewOnly": "View only",
+  "common.editable": "Editable",
+  "common.savedLabel": "saved",
+  "common.emptyLabel": "empty",
+  "common.none": "none",
+
+  "share.copyEdit": "🔗 Copy Edit Link",
+  "share.copyView": "🔒 Copy View Link",
+  "share.copiedEdit": "Copied edit link!",
+  "share.copiedView": "Copied view-only link!",
+
+  "anim.noteReadOnly": "• In view-only mode, Save / Clear / Import / chapter switching are disabled.",
+
   // Language
   "lang.jp": "JP",
   "lang.en": "EN",
   "lang.toggleTitle": "Language",
 
-    // Pitch
+  // Pitch
   "pitch.badge": "Free • Runs in your browser",
   "pitch.title": "RinkBoard",
   "pitch.subtitle": "Tactics board for Rink Hockey / Roller Hockey (2D/3D)",
@@ -101,7 +115,6 @@ const en = {
   "pitch.section.contact": "Contact",
   "pitch.section.contact.body":
     "For club/manufacturer demos, collaboration, or branding (logo/colors), please reach out.",
-
 };
 
 export default en;

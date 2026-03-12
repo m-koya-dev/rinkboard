@@ -70,12 +70,26 @@ const ja = {
   "players.footer1": "・削除してもチャプターや線は消えません（既存仕様を維持）",
   "players.footer2": "・再生中（Play中）に追加/削除をすると意図とズレる可能性があるので、基本は停止中推奨",
 
+  // Read only / shared UI
+  "common.viewOnly": "View only",
+  "common.editable": "編集可能",
+  "common.savedLabel": "saved",
+  "common.emptyLabel": "empty",
+  "common.none": "none",
+
+  "share.copyEdit": "🔗 Copy Edit Link",
+  "share.copyView": "🔒 Copy View Link",
+  "share.copiedEdit": "編集リンクをコピーしました",
+  "share.copiedView": "閲覧リンクをコピーしました",
+
+  "anim.noteReadOnly": "・閲覧モードでは Save / Clear / Import / chapter切替 は無効です",
+
   // Language
   "lang.jp": "JP",
   "lang.en": "EN",
   "lang.toggleTitle": "Language",
 
-    // Pitch
+  // Pitch
   "pitch.badge": "無料・ブラウザで動作",
   "pitch.title": "RinkBoard",
   "pitch.subtitle": "リンクホッケー / ローラーホッケー向け 戦術ボード（2D/3D）",
@@ -101,9 +115,6 @@ const ja = {
   "pitch.section.contact": "Contact",
   "pitch.section.contact.body":
     "クラブ・メーカー向けの導入相談、共同開発、ブランドカスタム（ロゴ/カラー）等はご連絡ください。",
-
 };
-
-
 
 export default ja;
