@@ -7,6 +7,7 @@ import SeoIntro from "./components/SeoIntro";
 import { t } from "./i18n";
 import PitchPage from "./components/PitchPage";
 import { decodeStateFromParam, encodeStateToParam } from "./share";
+import RactixBrand from "./components/RactixBrand";
 
 type ViewMode = "2d" | "3d";
 type PlaybackSpeed = 0.5 | 1 | 2;
@@ -110,15 +111,8 @@ function Header({
 
   return (
     <header className="flex items-center justify-between px-4 py-1 bg-slate-900/95 border-b border-slate-800">
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center font-bold text-slate-900">
-          R
-        </div>
-        <div className="flex flex-col leading-tight">
-          <span className="text-sm font-semibold text-slate-50">RinkBoard</span>
-          <span className="text-[11px] text-slate-400">{t(lang, "header.subtitle")}</span>
-        </div>
-      </div>
+      {/* 左：ロゴ */}
+      <RactixBrand compact />
 
       <div className="flex flex-col items-center gap-1">
         <div className="bg-slate-800/80 border border-slate-700 rounded-full p-1 flex items-center gap-1">
