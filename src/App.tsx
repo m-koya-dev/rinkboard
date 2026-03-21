@@ -8,6 +8,7 @@ import { t } from "./i18n";
 import PitchPage from "./components/PitchPage";
 import { decodeStateFromParam, encodeStateToParam } from "./share";
 import RactixBrand from "./components/RactixBrand";
+import SplashScreen from "./components/SplashScreen";
 
 type ViewMode = "2d" | "3d";
 type PlaybackSpeed = 0.5 | 1 | 2;
@@ -1014,6 +1015,8 @@ function ChapterPlayer({ playbackSpeed }: { playbackSpeed: PlaybackSpeed }) {
 export default function App() {
   const { lang, toggleLang } = useUiStore();
 
+  const [showSplash, setShowSplash] = useState(true);
+
   const sp0 = new URLSearchParams(window.location.search);
   const s0 = sp0.get("s");
   const page0 = sp0.get("page");
@@ -1042,6 +1045,14 @@ export default function App() {
       // 壊れたURLでも落とさない
     }
   }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setShowSplash(false);
+    }, 1700);
+
+    return () => window.clearTimeout(timer);
+}, []);
 
   const [viewMode, setViewMode] = useState<ViewMode>("2d");
   const { mode3D, setMode3D } = useBoardStore();
@@ -1156,6 +1167,8 @@ export default function App() {
 
   return (
     <div className="w-screen h-screen flex flex-col bg-slate-950 text-slate-100">
+      {showSplash && <SplashScreen />}
+
       <Header
         viewMode={viewMode}
         setViewMode={setViewMode}

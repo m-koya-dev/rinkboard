@@ -20,3 +20,30 @@ body {
   width: 100vw;
   height: 100vh;
 }
+
+
+@keyframes ractix-splash {
+  0% {
+    opacity: 0;
+    transform: translateX(-1280px);
+  }
+
+  22% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  68% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(36px);
+  }
+}
+
+.animate-ractix-splash {
+  animation: ractix-splash 1.35s ease-out forwards;
+}
